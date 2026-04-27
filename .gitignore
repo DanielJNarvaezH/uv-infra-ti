@@ -1,0 +1,23 @@
+# Variables de entorno sensibles
+.env
+*.env
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/var/log/
+
+# Archivos temporales
+*.tmp
+*.swp
+*~
+
+# Credenciales y certificados
+*.pem
+*.key
+*.crt
+id_rsa
+id_rsa.pub
