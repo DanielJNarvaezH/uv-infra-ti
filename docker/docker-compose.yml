@@ -1,0 +1,87 @@
+# =============================================================================
+# docker-compose.yml — Infraestructura TI SIG
+# Unidad para la Atención y Reparación Integral a las Víctimas
+# Universidad del Quindío — Semestre 2026-1
+# =============================================================================
+# Uso con Podman:
+#   alias docker=podman
+#   podman-compose up -d
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # srv-db-01 — Servidor de Base de Datos (VLAN 10 — 10.0.10.2)
+  # ---------------------------------------------------------------------------
+  srv-db-01:
+    build:
+      context: ./db
+      dockerfile: Dockerfile
+    container_name: srv-db-01
+    hostname: srv-db-01
+    restart: unless-stopped
+    env_file:
+      - ./db/.env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: ${TZ}
+      PGTZ: ${PGTZ}
+    volumes:
+      # Volumen persistente → montaje LVM (lv_db) en /mnt/uv_db del host
+      # En desarrollo local usar: ./db/data:/var/lib/postgresql/data
+      - ${DB_DATA_PATH:-./db/data}:/var/lib/postgresql/data
+      # Scripts de init (read-only — solo se ejecutan en primer arranque)
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      vlan10:
+        ipv4_address: 10.0.10.2
+    # Puerto NO expuesto al host: solo accesible desde VLAN 10 y VLAN 20 (regla de firewall)
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Próximos servicios — Sprint 2 (pendientes de implementar)
+  # ---------------------------------------------------------------------------
+  # srv-files-01  (Samba)     → ./files/
+  # srv-ntp-01    (chrony)    → ./ntp/
+  # srv-web-01    (Nginx)     → ./web/
+  # srv-web-02    (Nginx)     → ./web/
+  # srv-web-03    (Nginx)     → ./web/
+  # srv-dns-01    (BIND9)     → ./dns/
+  # srv-smtp-01   (MailHog)   → ./smtp/
+  # srv-dhcp-01   (dhcpd)     → ./dhcp/
+
+
+# =============================================================================
+# Redes — modelan la segmentación VLAN del diseño de red
+# =============================================================================
+networks:
+
+  vlan10:
+    name: vlan10_servidores
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.0.10.0/24
+          gateway: 10.0.10.1
+
+  vlan40:
+    name: vlan40_dmz
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.0.40.0/24
+          gateway: 10.0.40.1
