@@ -21,7 +21,7 @@ services:
     hostname: srv-db-01
     restart: unless-stopped
     env_file:
-      - ./db/.env
+      - ./.env
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -29,11 +29,10 @@ services:
       TZ: ${TZ}
       PGTZ: ${PGTZ}
     volumes:
-      # Volumen persistente → montaje LVM (lv_db) en /mnt/uv_db del host
-      # En desarrollo local usar: ./db/data:/var/lib/postgresql/data
-      - ${DB_DATA_PATH:-./db/data}:/var/lib/postgresql/data
+      # Volumen persistente
+      - pgdata:/var/lib/postgresql/data:Z
       # Scripts de init (read-only — solo se ejecutan en primer arranque)
-      - ./db/init:/docker-entrypoint-initdb.d:ro
+      - ./db/init:/docker-entrypoint-initdb.d:ro,Z
     networks:
       vlan10:
         ipv4_address: 10.0.10.2
@@ -85,3 +84,9 @@ networks:
       config:
         - subnet: 10.0.40.0/24
           gateway: 10.0.40.1
+
+# =============================================================================
+# Volúmenes — para persistencia de datos y configuración
+# =============================================================================
+volumes:
+  pgdata:
