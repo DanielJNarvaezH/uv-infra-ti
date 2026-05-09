@@ -9,6 +9,31 @@
 # =============================================================================
 
 services:
+  # ---------------------------------------------------------------------------
+  # srv-ntp-01 — Servidor NTP (chrony) (VLAN 10 — 10.0.10.3)
+  # ---------------------------------------------------------------------------
+  srv-ntp-01:
+    build:
+      context: ./ntp/
+      dockerfile: Dockerfile
+    container_name: srv-ntp-01
+    hostname: srv-ntp-01
+    restart: unless-stopped
+    networks:
+      vlan_10:
+        ipv4_address: 10.0.10.4
+    expose:
+      - "123"
+    healthcheck:
+      test: ["CMD-SHELL", "chronyc -n sources | grep '^*' >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ---------------------------------------------------------------------------
   # srv-db-01 — Servidor de Base de Datos (VLAN 10 — 10.0.10.2)
@@ -17,6 +42,9 @@ services:
     build:
       context: ./db
       dockerfile: Dockerfile
+    depends_on:
+      srv-ntp-01:
+        condition: service_healthy
     container_name: srv-db-01
     hostname: srv-db-01
     restart: unless-stopped
@@ -50,7 +78,7 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-  
+
   # ---------------------------------------------------------------------------
   # srv-files-01 — Servidor de Archivos (VLAN 10 — 10.0.10.3)
   # Samba SMB/CIFS | Share: /srv/uv_docs | Solo LAN, bloqueado desde DMZ
@@ -62,6 +90,9 @@ services:
       args:
         SAMBA_GID: ${SAMBA_GID:-1050}
         SAMBA_UID: ${SAMBA_UID:-1050}
+    depends_on:
+      srv-ntp-01:
+        condition: service_healthy
     container_name: srv-files-01
     hostname: srv-files-01
     restart: unless-stopped
@@ -93,8 +124,6 @@ services:
   # ---------------------------------------------------------------------------
   # Próximos servicios — Sprint 2 (pendientes de implementar)
   # ---------------------------------------------------------------------------
-  # srv-files-01  (Samba)     → ./files/
-  # srv-ntp-01    (chrony)    → ./ntp/
   # srv-web-01    (Nginx)     → ./web/
   # srv-web-02    (Nginx)     → ./web/
   # srv-web-03    (Nginx)     → ./web/
@@ -102,12 +131,10 @@ services:
   # srv-smtp-01   (MailHog)   → ./smtp/
   # srv-dhcp-01   (dhcpd)     → ./dhcp/
 
-
 # =============================================================================
 # Redes — modelan la segmentación VLAN del diseño de red
 # =============================================================================
 networks:
-
   vlan10:
     name: vlan10_servidores
     driver: bridge

@@ -12,6 +12,13 @@ LABEL project="uv-sig"
 LABEL description="Base de datos principal del SIG — Unidad de Víctimas"
 LABEL version="1.0"
 
+RUN apt-get update && apt-get install -y \
+        chrony \
+        ntpdate \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN ntpdate -q 10.0.10.4
+
 # El directorio oficial de inicialización de postgres:16.
 # Todo archivo .sql o .sh colocado aquí se ejecuta en orden alfanumérico
 # la primera vez que el contenedor arranca con un volumen vacío.
