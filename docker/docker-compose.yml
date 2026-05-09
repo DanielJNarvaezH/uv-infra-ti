@@ -50,7 +50,46 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-
+  
+  # ---------------------------------------------------------------------------
+  # srv-files-01 — Servidor de Archivos (VLAN 10 — 10.0.10.3)
+  # Samba SMB/CIFS | Share: /srv/uv_docs | Solo LAN, bloqueado desde DMZ
+  # ---------------------------------------------------------------------------
+  srv-files-01:
+    build:
+      context: ./files
+      dockerfile: Dockerfile
+      args:
+        SAMBA_GID: ${SAMBA_GID:-1050}
+        SAMBA_UID: ${SAMBA_UID:-1050}
+    container_name: srv-files-01
+    hostname: srv-files-01
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      SAMBA_USER: ${SAMBA_USER}
+      SAMBA_PASSWORD: ${SAMBA_PASSWORD}
+      SAMBA_GROUP: g_files
+      SAMBA_SHARE_PATH: /srv/uv_docs
+    volumes:
+      - samba_data:/srv/uv_docs:Z
+    networks:
+      vlan10:
+        ipv4_address: 10.0.10.3
+    expose:
+      - "445"
+    healthcheck:
+      test: ["CMD-SHELL", "testparm -s /etc/samba/smb.conf >/dev/null 2>&1 && pgrep smbd >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
   # ---------------------------------------------------------------------------
   # Próximos servicios — Sprint 2 (pendientes de implementar)
   # ---------------------------------------------------------------------------
@@ -90,3 +129,4 @@ networks:
 # =============================================================================
 volumes:
   pgdata:
+  samba_data:

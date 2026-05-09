@@ -20,10 +20,6 @@ COPY init/ /docker-entrypoint-initdb.d/
 # El puerto estándar de PostgreSQL (documentación; el binding real va en compose)
 EXPOSE 5432
 
-# La imagen oficial ya define VOLUME ["/var/lib/postgresql/data"].
-# El volumen persistente se monta desde docker-compose (host → /var/lib/postgresql/data).
-# No redefinir VOLUME aquí para no crear volúmenes anónimos no gestionados.
-
 # Healthcheck: verifica que la BD responde antes de que otros contenedores dependan de ella
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} || exit 1
