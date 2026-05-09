@@ -36,6 +36,49 @@ services:
         max-file: "3"
 
   # ---------------------------------------------------------------------------
+  # srv-php-fpm — Servidor PHP-FPM (VLAN 10 — 10.0.10.8)
+  # ---------------------------------------------------------------------------
+  srv-php-fpm:
+    build:
+      context: ./web/srv-php-fpm
+      dockerfile: Dockerfile
+    container_name: srv-php-fpm
+    hostname: srv-php-fpm
+    restart: unless-stopped
+    networks:
+      vlan_10:
+        ipv4_address: 10.0.10.8
+    expose:
+      - "9000"
+    healthcheck:
+      test: ["CMD-SHELL", "php-fpm -t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # srv-certbot — Servidor Certbot (VLAN 10 — 10.0.10.9)
+  # ---------------------------------------------------------------------------
+  srv-certbot:
+    image: certbot/certbot:latest
+    container_name: srv-certbot
+    hostname: srv-certbot
+    restart: unless-stopped
+    networks:
+      vlan_10:
+        ipv4_address: 10.0.10.9
+    volumes:
+      - ./web/certbot/www/:/var/www/certbot/:rw
+      - ./web/certbot/conf/:/etc/letsencrypt/:rw
+    # El comando por defecto verificará cada 12 horas si el certificado necesita renovación
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done'"
+
+  # ---------------------------------------------------------------------------
   # srv-db-01 — Servidor de Base de Datos (VLAN 10 — 10.0.10.2)
   # ---------------------------------------------------------------------------
   srv-db-01:
@@ -111,7 +154,11 @@ services:
     expose:
       - "445"
     healthcheck:
-      test: ["CMD-SHELL", "testparm -s /etc/samba/smb.conf >/dev/null 2>&1 && pgrep smbd >/dev/null"]
+      test:
+        [
+          "CMD-SHELL",
+          "testparm -s /etc/samba/smb.conf >/dev/null 2>&1 && pgrep smbd >/dev/null",
+        ]
       interval: 30s
       timeout: 10s
       start_period: 20s
@@ -121,10 +168,47 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # srv-web-01 — Servidor Web (VLAN 40 — 10.0.40.2, VLAN 10 — 10.0.10.7)
+  # ---------------------------------------------------------------------------
+  srv-web-01:
+    image: nginx:latest
+    depends_on:
+      srv-db-01:
+        condition: service_healthy
+      srv-php-fpm:
+        condition: service_healthy
+      srv-certbot:
+        condition: service_healthy
+    networks:
+      # Tendrá que conectarse a la VLAN 40 y la VLAN 10 para acceder a los servicios
+      # de PHP-FPM, la base de datos y certbot para el TLS.
+      vlan40:
+        ipv4_address: 10.0.40.2
+      vlan10:
+        ipv4_address: 10.0.10.7
+    volumes:
+      - type: bind
+        source: ./web/srv-web-01
+        target: /usr/share/nginx/html
+        read_only: true
+    ports:
+      - "80:80"
+    healthcheck:
+      test: ["CMD-SHELL", "sudo nginx -t && curl -f http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   # ---------------------------------------------------------------------------
   # Próximos servicios — Sprint 2 (pendientes de implementar)
   # ---------------------------------------------------------------------------
-  # srv-web-01    (Nginx)     → ./web/
   # srv-web-02    (Nginx)     → ./web/
   # srv-web-03    (Nginx)     → ./web/
   # srv-dns-01    (BIND9)     → ./dns/
