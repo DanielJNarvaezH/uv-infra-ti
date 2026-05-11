@@ -14,10 +14,9 @@ LABEL version="1.0"
 
 RUN apt-get update && apt-get install -y \
         chrony \
-        ntpdate \
+        ntpsec-ntpdate  \
     && rm -rf /var/lib/apt/lists/*
 
-RUN ntpdate -q 10.0.10.4
 
 # El directorio oficial de inicialización de postgres:16.
 # Todo archivo .sql o .sh colocado aquí se ejecuta en orden alfanumérico

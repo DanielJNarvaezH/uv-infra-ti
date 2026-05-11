@@ -19,13 +19,16 @@ services:
     container_name: srv-ntp-01
     hostname: srv-ntp-01
     restart: unless-stopped
+    privileged: true
+    cap_add:
+      - SYS_TIME
     networks:
-      vlan_10:
+      vlan10:
         ipv4_address: 10.0.10.4
     expose:
       - "123"
     healthcheck:
-      test: ["CMD-SHELL", "chronyc -n sources | grep '^*' >/dev/null"]
+      test: [ "CMD-SHELL", "chronyc -n sources | grep '^*' >/dev/null" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -46,12 +49,12 @@ services:
     hostname: srv-php-fpm
     restart: unless-stopped
     networks:
-      vlan_10:
+      vlan10:
         ipv4_address: 10.0.10.8
     expose:
       - "9000"
     healthcheck:
-      test: ["CMD-SHELL", "php-fpm -t"]
+      test: [ "CMD-SHELL", "php-fpm -t" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -70,7 +73,7 @@ services:
     hostname: srv-certbot
     restart: unless-stopped
     networks:
-      vlan_10:
+      vlan10:
         ipv4_address: 10.0.10.9
     volumes:
       - ./web/certbot/www/:/var/www/certbot/:rw
@@ -111,7 +114,7 @@ services:
     expose:
       - "5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       interval: 30s
       timeout: 10s
       start_period: 40s
@@ -154,11 +157,7 @@ services:
     expose:
       - "445"
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "testparm -s /etc/samba/smb.conf >/dev/null 2>&1 && pgrep smbd >/dev/null",
-        ]
+      test: [ "CMD-SHELL", "testparm -s /etc/samba/smb.conf >/dev/null 2>&1 && pgrep smbd >/dev/null" ]
       interval: 30s
       timeout: 10s
       start_period: 20s
@@ -196,7 +195,7 @@ services:
     ports:
       - "80:80"
     healthcheck:
-      test: ["CMD-SHELL", "sudo nginx -t && curl -f http://localhost"]
+      test: [ "CMD-SHELL", "sudo nginx -t && curl -f http://localhost" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -205,7 +204,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-
   # ---------------------------------------------------------------------------
   # Próximos servicios — Sprint 2 (pendientes de implementar)
   # ---------------------------------------------------------------------------
@@ -215,9 +213,9 @@ services:
   # srv-smtp-01   (MailHog)   → ./smtp/
   # srv-dhcp-01   (dhcpd)     → ./dhcp/
 
-# =============================================================================
-# Redes — modelan la segmentación VLAN del diseño de red
-# =============================================================================
+  # =============================================================================
+  # Redes — modelan la segmentación VLAN del diseño de red
+  # =============================================================================
 networks:
   vlan10:
     name: vlan10_servidores

@@ -10,6 +10,18 @@ log() {
 : "${SAMBA_GROUP:=g_files}"
 : "${SAMBA_SHARE_PATH:=/srv/uv_docs}"
 
+# ============================================================
+# Sincronización horaria con servidor NTP (opcional)
+# ============================================================
+log "Sincronizando hora con servidor NTP (10.0.10.4)..."
+if command -v ntpdate >/dev/null 2>&1; then
+    ntpdate -u 10.0.10.4 2>/dev/null \
+        && log "Sincronización exitosa" \
+        || log "ADVERTENCIA: No se pudo sincronizar la hora (el servicio continuará)"
+else
+    log "ADVERTENCIA: ntpdate no está instalado. Se omite sincronización."
+fi
+
 log "Preparando share ${SAMBA_SHARE_PATH}..."
 
 mkdir -p "${SAMBA_SHARE_PATH}"

@@ -18,11 +18,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         tini \
         ca-certificates \
         chrony \
-        ntpdate \
+        ntpsec-ntpdate \
     && rm -rf /var/lib/apt/lists/*
     
-RUN ntpdate -q 10.0.10.4 
-
 ARG SAMBA_GID=1050
 ARG SAMBA_UID=1050
 
