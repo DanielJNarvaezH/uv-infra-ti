@@ -2,8 +2,10 @@
 FROM php:8.2-fpm-alpine
 
 # Metadatos
-LABEL maintainer="Juan-Devgo"
+LABEL maintainer="uv-infra-ti"
+LABEL project="uv-sig"
 LABEL description="Contenedor PHP-FPM seguro y optimizado para producción"
+LABEL version="1.0"
 
 # Instalar dependencias del sistema y extensiones de PHP necesarias
 RUN apk add --no-cache \

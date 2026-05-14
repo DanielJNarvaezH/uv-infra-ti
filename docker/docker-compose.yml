@@ -28,7 +28,7 @@ services:
     expose:
       - "123"
     healthcheck:
-      test: [ "CMD-SHELL", "chronyc -n sources | grep '^*' >/dev/null" ]
+      test: ["CMD-SHELL", "chronyc tracking | grep -i 'reference id'"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -76,8 +76,8 @@ services:
       vlan10:
         ipv4_address: 10.0.10.9
     volumes:
-      - ./web/certbot/www/:/var/www/certbot/:rw
-      - ./web/certbot/conf/:/etc/letsencrypt/:rw
+      - ./web/certbot/www/:/var/www/certbot/:rw,Z
+      - ./web/certbot/conf/:/etc/letsencrypt/:rw,Z
     # El comando por defecto verificará cada 12 horas si el certificado necesita renovación
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done'"
 
@@ -179,7 +179,7 @@ services:
       srv-php-fpm:
         condition: service_healthy
       srv-certbot:
-        condition: service_healthy
+        condition: service_started
     networks:
       # Tendrá que conectarse a la VLAN 40 y la VLAN 10 para acceder a los servicios
       # de PHP-FPM, la base de datos y certbot para el TLS.
@@ -193,11 +193,49 @@ services:
         target: /usr/share/nginx/html
         read_only: true
     ports:
-      - "80:80"
+      - "8080:80"
     healthcheck:
       test: [ "CMD-SHELL", "sudo nginx -t && curl -f http://localhost" ]
       interval: 30s
       timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+  # ---------------------------------------------------------------------------
+  # srv-smtp-01 — Servidor de Correo SMTP / MailHog (VLAN 40 — 10.0.40.4)
+  # SMTP (submission) : 587  — solo desde VLAN 10 y VLAN 20
+  # Interfaz web      : 8025 — solo desde VLAN 20 (regla de firewall)
+  # ---------------------------------------------------------------------------
+  srv-smtp-01:
+    build:
+      context: ./smtp
+      dockerfile: Dockerfile
+    container_name: srv-smtp-01
+    hostname: srv-smtp-01
+    restart: unless-stopped
+    environment:
+      # Escuchar SMTP en el puerto 587 (submission) en lugar del 1025 predeterminado
+      MH_SMTP_BIND_ADDR: "0.0.0.0:1025"
+      # Interfaz web y API en el puerto estándar de MailHog
+      MH_API_BIND_ADDR: "0.0.0.0:8025"
+      MH_UI_BIND_ADDR: "0.0.0.0:8025"
+      # Almacenamiento en memoria — suficiente para pruebas (se pierde al reiniciar)
+      MH_STORAGE: "memory"
+    networks:
+      vlan40:
+        ipv4_address: 10.0.40.4
+    # Puertos NO publicados al host: el acceso se controla por las reglas de firewall VLAN
+    expose:
+      - "587"
+      - "8025"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8025/api/v2/messages >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
       retries: 3
     logging:
       driver: "json-file"
@@ -210,7 +248,6 @@ services:
   # srv-web-02    (Nginx)     → ./web/
   # srv-web-03    (Nginx)     → ./web/
   # srv-dns-01    (BIND9)     → ./dns/
-  # srv-smtp-01   (MailHog)   → ./smtp/
   # srv-dhcp-01   (dhcpd)     → ./dhcp/
 
   # =============================================================================
