@@ -11,6 +11,16 @@ log() {
 : "${SAMBA_SHARE_PATH:=/srv/uv_docs}"
 
 # ============================================================
+# SSH — arrancar sshd en puerto 2222
+# ============================================================
+log "Iniciando sshd en puerto 2222..."
+if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
+    ssh-keygen -A
+fi
+/usr/sbin/sshd
+log "sshd arrancado."
+
+# ============================================================
 # Sincronización horaria con servidor NTP (opcional)
 # ============================================================
 log "Sincronizando hora con servidor NTP (10.0.10.4)..."

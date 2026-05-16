@@ -11,6 +11,13 @@ LABEL version="1.0"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# -----------------------------------------------------------------------------
+# Llave pública SSH — se pasa en tiempo de build, nunca se hardcodea
+# Uso: podman build --build-arg SSH_PUBLIC_KEY="$(cat ~/.ssh/id_rsa.pub)" ...
+# El docker-compose.yml lo lee desde SSH_PUBLIC_KEY en el .env
+# -----------------------------------------------------------------------------
+ARG SSH_PUBLIC_KEY=""
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
         samba \
         samba-common-bin \
@@ -19,13 +26,40 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
         chrony \
         ntpsec-ntpdate \
+        openssh-server \
     && rm -rf /var/lib/apt/lists/*
-    
+
 ARG SAMBA_GID=1050
 ARG SAMBA_UID=1050
 
 RUN groupadd -g ${SAMBA_GID} g_files \
     && useradd -M -u ${SAMBA_UID} -g g_files -s /usr/sbin/nologin uv_files_user
+
+# -----------------------------------------------------------------------------
+# Configuración SSH segura
+# - Puerto 2222
+# - Sin login root
+# - Solo autenticación por llave pública
+# -----------------------------------------------------------------------------
+RUN mkdir -p /var/run/sshd \
+    && sed -i 's/^#\?Port .*/Port 2222/'               /etc/ssh/sshd_config \
+    && sed -i 's/^#\?PermitRootLogin .*/PermitRootLogin no/' /etc/ssh/sshd_config \
+    && sed -i 's/^#\?PasswordAuthentication .*/PasswordAuthentication no/' /etc/ssh/sshd_config \
+    && sed -i 's/^#\?PubkeyAuthentication .*/PubkeyAuthentication yes/' /etc/ssh/sshd_config \
+    && sed -i 's/^#\?ChallengeResponseAuthentication .*/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config \
+    && echo "AllowUsers uv_admin" >> /etc/ssh/sshd_config
+
+# Usuario dedicado para acceso SSH al servidor de archivos
+RUN useradd -m -s /bin/bash uv_admin \
+    && mkdir -p /home/uv_admin/.ssh \
+    && chmod 700 /home/uv_admin/.ssh
+
+# Instalar llave pública si se pasó como build arg
+RUN if [ -n "${SSH_PUBLIC_KEY}" ]; then \
+        echo "${SSH_PUBLIC_KEY}" > /home/uv_admin/.ssh/authorized_keys \
+        && chmod 600 /home/uv_admin/.ssh/authorized_keys \
+        && chown -R uv_admin:uv_admin /home/uv_admin/.ssh; \
+    fi
 
 COPY smb.conf /etc/samba/smb.conf
 COPY entrypoint.sh /entrypoint.sh
@@ -35,5 +69,6 @@ RUN chmod +x /entrypoint.sh \
     && chmod 2770 /srv/uv_docs
 
 EXPOSE 445
+EXPOSE 2222
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/entrypoint.sh"]
