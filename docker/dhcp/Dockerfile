@@ -24,6 +24,11 @@ COPY dhcpd.conf /etc/dhcp/dhcpd.conf
 # isc-dhcp-server necesita este archivo para el leasedb
 RUN touch /var/lib/dhcp/dhcpd.leases
 
+# Usuario no-root dedicado para dhcpd
+RUN groupadd -r dhcpuser && useradd -r -g dhcpuser -s /usr/sbin/nologin dhcpuser \
+    && chown dhcpuser:dhcpuser /var/lib/dhcp \
+    && chown dhcpuser:dhcpuser /var/lib/dhcp/dhcpd.leases
+
 # Copiar entrypoint
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

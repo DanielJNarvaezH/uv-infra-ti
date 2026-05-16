@@ -71,4 +71,8 @@ RUN chmod +x /entrypoint.sh \
 EXPOSE 445
 EXPOSE 2222
 
+# Healthcheck: verifica que smbd está corriendo y la config es válida
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+    CMD testparm -s /etc/samba/smb.conf >/dev/null 2>&1 && pgrep smbd >/dev/null || exit 1
+
 ENTRYPOINT ["/usr/bin/tini", "--", "/entrypoint.sh"]
