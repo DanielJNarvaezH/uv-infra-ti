@@ -4,7 +4,7 @@
 # Sistema Integrado de Gestión (SIG)
 # =============================================================================
 
-FROM mailhog/mailhog:latest
+FROM docker.io/mailhog/mailhog:latest
 
 LABEL maintainer="uv-infra-ti"
 LABEL project="uv-sig"

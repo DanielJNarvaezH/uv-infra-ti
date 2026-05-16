@@ -4,7 +4,7 @@
 # Sistema Integrado de Gestión (SIG)
 # =============================================================================
 # Imagen base oficial — versión fijada para reproducibilidad
-FROM postgres:16
+FROM docker.io/library/postgres:16
 
 # Metadatos del contenedor
 LABEL maintainer="uv-infra-ti"
