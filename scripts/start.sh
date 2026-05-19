@@ -48,22 +48,41 @@ podman-compose up -d ${BUILD_FLAG} \
     srv-ntp-01 \
     srv-db-01 \
     srv-files-01 \
-    srv-smtp-01
+    srv-smtp-01 \
+    srv-php-fpm \
+    srv-dns-01
 
 # -----------------------------------------------------------------------------
-# 2. Levantar srv-dhcp-01 en VLAN 10
+# 2. Levantar servidores web y proxy
+# -----------------------------------------------------------------------------
+log "Levantando servidores web y proxy..."
+podman-compose up -d ${BUILD_FLAG} \
+    srv-web-01 \
+    srv-web-02 \
+    srv-web-03 \
+    srv-proxy-01
+
+# -----------------------------------------------------------------------------
+# 3. Levantar srv-dhcp-01 en VLAN 10
 # -----------------------------------------------------------------------------
 log "Levantando srv-dhcp-01..."
 podman-compose up -d ${BUILD_FLAG} srv-dhcp-01
 
 # -----------------------------------------------------------------------------
-# 3. Conectar srv-dhcp-01 a VLAN 20 y VLAN 30
+# 4. Conectar srv-dhcp-01 a VLAN 20 y VLAN 30
 #    (necesario porque podman-compose no soporta --ip con múltiples redes)
 # -----------------------------------------------------------------------------
 log "Conectando srv-dhcp-01 a vlan20 y vlan30..."
 
+# Crear redes si no existen (podman-compose no las crea si no están en uso)
 if ! podman network inspect vlan20_administracion --format '{{.Name}}' >/dev/null 2>&1; then
-    warn "Red vlan20_administracion no existe — será creada por podman-compose."
+    log "Creando red vlan20_administracion..."
+    podman network create --driver bridge --subnet 10.0.20.0/24 --gateway 10.0.20.1 vlan20_administracion
+fi
+
+if ! podman network inspect vlan30_usuarios --format '{{.Name}}' >/dev/null 2>&1; then
+    log "Creando red vlan30_usuarios..."
+    podman network create --driver bridge --subnet 10.0.30.0/24 --gateway 10.0.30.1 vlan30_usuarios
 fi
 
 # Conectar solo si no está ya conectado
@@ -82,12 +101,12 @@ else
 fi
 
 # -----------------------------------------------------------------------------
-# 4. Esperar a que los servicios estén healthy
+# 5. Esperar a que los servicios estén healthy (máx. 120s)
 # -----------------------------------------------------------------------------
-log "Esperando que los servicios estén healthy (máx. 90s)..."
+log "Esperando que los servicios estén healthy (máx. 120s)..."
 
-SERVICES=("srv-ntp-01" "srv-db-01" "srv-files-01" "srv-smtp-01" "srv-dhcp-01")
-TIMEOUT=90
+SERVICES=("srv-ntp-01" "srv-db-01" "srv-files-01" "srv-smtp-01" "srv-dhcp-01" "srv-php-fpm" "srv-web-01" "srv-web-02" "srv-web-03" "srv-proxy-01" "srv-dns-01")
+TIMEOUT=120
 ELAPSED=0
 
 while [ $ELAPSED -lt $TIMEOUT ]; do
@@ -107,7 +126,7 @@ while [ $ELAPSED -lt $TIMEOUT ]; do
 done
 
 # -----------------------------------------------------------------------------
-# 5. Estado final
+# 6. Estado final
 # -----------------------------------------------------------------------------
 echo ""
 log "=== Estado del stack ==="
@@ -122,7 +141,20 @@ if $ALL_HEALTHY; then
     log "  srv-db-01    → ssh -p 2222 uv_dbadmin@localhost"
     log "  srv-files-01 → ssh -p 2223 uv_admin@localhost"
     log ""
+    log "NPM Admin UI  → http://localhost:8081"
     log "MailHog UI    → http://localhost:8025 (solo desde VLAN 20)"
+    log ""
+    log "Dominios locales (configurar DNS o /etc/hosts):"
+    log "  http://unidadvictimas.co:8080      → redirige a HTTPS en :8443"
+    log "  http://proxy.unidadvictimas.co:8080"
+    log "  http://rni.unidadvictimas.co:8080"
+    log "  http://internal.unidadvictimas.co:8080"
+    log ""
+    log "Nota: en entornos rootless (Podman sin root) los puertos 80/443"
+    log "      requieren sysctl. Para usar puertos estándar ejecuta:"
+    log "      sudo sysctl net.ipv4.ip_unprivileged_port_start=80"
+    log ""
+    log "Acceso directo srv-web-01 → http://localhost:8082"
 else
     warn "Algunos servicios aún no están healthy. Verifica con:"
     warn "  podman ps -a"

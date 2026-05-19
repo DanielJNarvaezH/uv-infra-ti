@@ -21,3 +21,13 @@ Thumbs.db
 *.crt
 id_rsa
 id_rsa.pub
+keys.json
+
+# Nginx Proxy Manager runtime data (ignorar contenido, mantener directorio)
+docker/web/proxy/data/*
+!docker/web/proxy/data/.gitkeep
+docker/web/proxy/letsencrypt/*
+!docker/web/proxy/letsencrypt/.gitkeep
+
+# Agents documentation
+AGENTS.md
