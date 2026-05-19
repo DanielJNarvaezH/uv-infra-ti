@@ -13,15 +13,15 @@ INSERT INTO sig.funcionarios (id, nombre, apellido, cargo, email) VALUES
     ('a1000000-0000-0000-0000-000000000001',
      'María Fernanda', 'Ríos Castillo',
      'Profesional de Atención a Víctimas',
-     'mfrios@unidadvictimas.gov.co'),
+      'mfrios@unidadvictimas.co'),
     ('a1000000-0000-0000-0000-000000000002',
      'Carlos Andrés', 'Muñoz Herrera',
      'Coordinador de Registro y Valoración',
-     'camuñoz@unidadvictimas.gov.co'),
+     'camuñoz@unidadvictimas.co'),
     ('a1000000-0000-0000-0000-000000000003',
      'Luz Marina', 'Torres Quintero',
      'Psicóloga — Área de Atención Psicosocial',
-     'lmtorres@unidadvictimas.gov.co');
+     'lmtorres@unidadvictimas.co');
 
 -- -----------------------------------------------------------------------------
 -- Víctimas (datos ficticios — solo representativos del sistema)

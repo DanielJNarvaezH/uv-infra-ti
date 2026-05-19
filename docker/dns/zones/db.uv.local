@@ -1,0 +1,22 @@
+$TTL    604800
+@       IN      SOA     srv-dns-01.uv.local. admin.uv.local. (
+                              1         ; Serial
+                         604800         ; Refresh
+                          86400         ; Retry
+                        2419200         ; Expire
+                         604800 )       ; Negative Cache TTL
+;
+@       IN      NS      srv-dns-01.uv.local.
+
+; Registros A para servidores internos (resolución por nombre)
+srv-web-01      IN      A       10.0.40.2
+srv-web-02      IN      A       10.0.40.5
+srv-web-03      IN      A       10.0.10.5
+srv-db-01       IN      A       10.0.10.2
+srv-files-01    IN      A       10.0.10.3
+srv-ntp-01      IN      A       10.0.10.4
+srv-dhcp-01     IN      A       10.0.10.6
+srv-dns-01      IN      A       10.0.40.3
+srv-smtp-01     IN      A       10.0.40.4
+srv-proxy-01    IN      A       10.0.40.6
+srv-php-fpm     IN      A       10.0.10.8
