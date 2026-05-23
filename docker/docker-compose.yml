@@ -292,7 +292,7 @@ services:
         max-file: "3"
 
   # ---------------------------------------------------------------------------
-  # srv-proxy-01 — Nginx Proxy Manager (VLAN 40 — 10.0.40.6, VLAN 10 — 10.0.10.10)
+  # c
   # SSL/TLS, balanceo de carga y proxy reverso centralizado
   # ---------------------------------------------------------------------------
   srv-proxy-01:
