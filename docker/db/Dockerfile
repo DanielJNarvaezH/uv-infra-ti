@@ -19,6 +19,12 @@ LABEL version="1.0"
 # -----------------------------------------------------------------------------
 ARG SSH_PUBLIC_KEY=""
 
+# Variables de entorno documentadas (se inyectan desde .env via docker-compose)
+# POSTGRES_DB       : nombre de la base de datos (usado en HEALTHCHECK)
+# POSTGRES_USER     : usuario administrador de PostgreSQL
+# POSTGRES_PASSWORD : contraseña del usuario administrador
+# TZ / PGTZ         : zona horaria del servidor y de PostgreSQL
+
 RUN apt-get update && apt-get install -y \
         chrony \
         ntpsec-ntpdate \

@@ -8,9 +8,11 @@ LABEL description="Contenedor PHP-FPM seguro y optimizado para producción"
 LABEL version="1.0"
 
 # Instalar dependencias del sistema y extensiones de PHP necesarias
+# libpq-dev: librería de desarrollo de PostgreSQL, requerida para compilar pdo_pgsql
 RUN apk add --no-cache \
     tzdata \
-    && docker-php-ext-install pdo pdo_mysql mysqli opcache \
+    libpq-dev \
+    && docker-php-ext-install pdo pdo_pgsql pdo_mysql mysqli opcache \
     && rm -rf /var/cache/apk/*
 
 # Configurar la zona horaria
@@ -29,6 +31,10 @@ RUN chown -R www-data:www-data /var/www/html
 
 # FPM corre en el puerto 9000 por defecto
 EXPOSE 9000
+
+# Healthcheck: verifica que php-fpm arranca y la config es válida
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD php-fpm -t 2>&1 | grep -q "successful" || exit 1
 
 # El comando por defecto ya es "php-fpm" en la imagen base
 CMD ["php-fpm"]

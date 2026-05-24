@@ -49,8 +49,7 @@ services:
     hostname: srv-php-fpm
     restart: unless-stopped
     networks:
-      vlan10:
-        ipv4_address: 10.0.10.8
+      backend:
     expose:
       - "9000"
     volumes:
@@ -175,7 +174,7 @@ services:
   # PHP-FPM a través de srv-php-fpm:9000
   # ---------------------------------------------------------------------------
   srv-web-01:
-    image: nginx:alpine
+    image: docker.io/library/nginx:alpine
     container_name: srv-web-01
     hostname: srv-web-01
     restart: unless-stopped
@@ -186,9 +185,7 @@ services:
         condition: service_healthy
     networks:
       vlan40:
-        ipv4_address: 10.0.40.2
-      vlan10:
-        ipv4_address: 10.0.10.7
+      backend:
     volumes:
       - type: bind
         source: ./web/srv-web-01/html
@@ -221,7 +218,7 @@ services:
   # PHP-FPM a través de srv-php-fpm:9000
   # ---------------------------------------------------------------------------
   srv-web-02:
-    image: nginx:alpine
+    image: docker.io/library/nginx:alpine
     container_name: srv-web-02
     hostname: srv-web-02
     restart: unless-stopped
@@ -232,9 +229,7 @@ services:
         condition: service_healthy
     networks:
       vlan40:
-        ipv4_address: 10.0.40.5
-      vlan10:
-        ipv4_address: 10.0.10.11
+      backend:
     volumes:
       - type: bind
         source: ./web/srv-web-02/html
@@ -262,7 +257,7 @@ services:
   # Servidor estático, sin PHP-FPM
   # ---------------------------------------------------------------------------
   srv-web-03:
-    image: nginx:alpine
+    image: docker.io/library/nginx:alpine
     container_name: srv-web-03
     hostname: srv-web-03
     restart: unless-stopped
@@ -296,7 +291,7 @@ services:
   # SSL/TLS, balanceo de carga y proxy reverso centralizado
   # ---------------------------------------------------------------------------
   srv-proxy-01:
-    image: jc21/nginx-proxy-manager:latest
+    image: docker.io/jc21/nginx-proxy-manager:latest
     container_name: srv-proxy-01
     hostname: srv-proxy-01
     restart: unless-stopped
@@ -310,8 +305,6 @@ services:
     networks:
       vlan40:
         ipv4_address: 10.0.40.6
-      vlan10:
-        ipv4_address: 10.0.10.10
     ports:
       - "8080:80"
       - "8443:443"
@@ -468,6 +461,11 @@ networks:
       config:
         - subnet: 10.0.40.0/24
           gateway: 10.0.40.1
+
+  backend:
+    name: backend_phpfpm
+    driver: bridge
+    internal: true
 
 # =============================================================================
 # Volúmenes — para persistencia de datos y configuración
