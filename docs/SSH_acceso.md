@@ -104,7 +104,7 @@ podman exec srv-db-01 journalctl -u sshd 2>/dev/null || \
 | `PasswordAuthentication` | `no` | Solo llaves — elimina ataques de fuerza bruta |
 | `PubkeyAuthentication` | `yes` | Autenticación por llave pública habilitada |
 | `ChallengeResponseAuthentication` | `no` | Deshabilitado para mayor seguridad |
-| `AllowUsers` | `uv_dbadmin` / `uv_admin` | Lista blanca explícita de usuarios permitidos |
+| `AllowUsers` | `uv_dbadmin` / `uv_admin` / `uv_webmaster` | Lista blanca explícita de usuarios permitidos |
 
 ---
 

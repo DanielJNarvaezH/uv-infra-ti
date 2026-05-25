@@ -127,3 +127,23 @@ ls -ld /tmp                           # debe tener 't' al final
 | SETUID | `4000` | Ejecuta como propietario del archivo | Sin efecto significativo |
 | SETGID | `2000` | Ejecuta como grupo del archivo | Archivos hijos heredan el grupo |
 | Sticky | `1000` | Sin efecto en Linux moderno | Solo el propietario puede borrar |
+
+## 8. Política de contraseñas
+
+- Longitud mínima: 12 caracteres.
+- Caducidad: 90 días (PASS_MAX_DAYS = 90).
+- Requisitos recomendados: mezcla de mayúsculas, minúsculas, dígitos y símbolos; historial de contraseñas (p. ej. remember=5); edad mínima 7 días.
+- Ejemplo de configuración (Debian/Ubuntu):
+  1. Instalar módulo de calidad de contraseñas:
+     sudo apt update && sudo apt install -y libpam-pwquality
+  2. Forzar longitud mínima en /etc/pam.d/common-password:
+     password requisite pam_pwquality.so retry=3 minlen=12 difok=3
+  3. Establecer caducidad por defecto en /etc/login.defs:
+     PASS_MAX_DAYS 90
+     PASS_MIN_DAYS 7
+     PASS_WARN_AGE 14
+  4. Aplicar a usuarios existentes:
+     for u in uv_admin uv_webmaster uv_dbadmin; do sudo chage -M 90 -m 7 -W 14 $u; done
+
+Ajustar estos valores según la política organizacional y validar en entorno de staging antes de aplicar en producción.
+

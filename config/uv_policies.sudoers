@@ -1,0 +1,15 @@
+# uv_policies - sudoers fragment for /etc/sudoers.d/uv_policies
+# Validate with: visudo -cf /etc/sudoers.d/uv_policies
+
+# Full admin
+uv_admin ALL=(ALL) ALL
+
+# Commands to manage nginx
+Cmnd_Alias NGINX_CMDS = /bin/systemctl restart nginx, /bin/systemctl reload nginx, /usr/bin/systemctl restart nginx, /usr/bin/systemctl reload nginx, /usr/sbin/service nginx *, /usr/sbin/nginx -s reload
+
+uv_webmaster ALL=(root) NOPASSWD: NGINX_CMDS
+
+# Commands to manage PostgreSQL
+Cmnd_Alias PG_CMDS = /bin/systemctl start postgresql, /bin/systemctl stop postgresql, /bin/systemctl restart postgresql, /usr/bin/systemctl start postgresql, /usr/bin/systemctl restart postgresql, /usr/sbin/service postgresql *, /usr/bin/psql, /usr/bin/pg_ctl
+
+uv_dbadmin ALL=(root) NOPASSWD: PG_CMDS
