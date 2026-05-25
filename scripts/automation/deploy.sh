@@ -13,6 +13,7 @@
 #     5. users.sh          — Usuarios, grupos y permisos especiales
 #     6. samba-setup.sh    — Preparación del host para Samba
 #     7. start.sh          — Levantar el stack de contenedores Podman
+#     8. Cron backup       — Programar backup automático diario a las 2:00 AM
 #
 # USO:
 #   bash scripts/automation/deploy.sh                # despliegue completo
@@ -20,6 +21,7 @@
 #   bash scripts/automation/deploy.sh --skip-raid     # omitir RAID+LVM
 #   bash scripts/automation/deploy.sh --build          # rebuild de imágenes
 #   bash scripts/automation/deploy.sh --only stack     # solo levantar contenedores
+#   bash scripts/automation/deploy.sh --skip-cron      # omitir cron de backup
 #
 # REQUISITOS:
 #   - Podman y podman-compose instalados
@@ -52,6 +54,7 @@ SKIP_FIREWALL=false
 SKIP_USERS=false
 SKIP_SAMBA=false
 SKIP_STACK=false
+SKIP_CRON=false
 BUILD_FLAG=""
 
 # ── Parsear argumentos ─────────────────────────────────────────────────────────
@@ -64,6 +67,7 @@ for arg in "$@"; do
         --skip-users)    SKIP_USERS=true ;;
         --skip-samba)    SKIP_SAMBA=true ;;
         --skip-stack)    SKIP_STACK=true ;;
+        --skip-cron)     SKIP_CRON=true ;;
         --build)         BUILD_FLAG="--build" ;;
         --only)
             # Si se pasa --only <paso>, solo ejecutar ese paso
@@ -82,6 +86,7 @@ if [[ -n "${ONLY_STEP:-}" ]]; then
     SKIP_USERS=true
     SKIP_SAMBA=true
     SKIP_STACK=true
+    SKIP_CRON=true
     case "$ONLY_STEP" in
         pull)     SKIP_PULL=false ;;
         firewall) SKIP_FIREWALL=false ;;
@@ -90,7 +95,8 @@ if [[ -n "${ONLY_STEP:-}" ]]; then
         users)    SKIP_USERS=false ;;
         samba)    SKIP_SAMBA=false ;;
         stack)    SKIP_STACK=false ;;
-        *) err "Paso desconocido: $ONLY_STEP. Válidos: pull, firewall, raid, lvm, users, samba, stack" ;;
+        cron)     SKIP_CRON=false ;;
+        *) err "Paso desconocido: $ONLY_STEP. Válidos: pull, firewall, raid, lvm, users, samba, stack, cron" ;;
     esac
 fi
 
@@ -111,7 +117,7 @@ fi
 # PASO 1 — Git Pull
 # =============================================================================
 if ! $SKIP_PULL; then
-    section "Paso 1/7 — Actualizando repositorio (git pull)"
+    section "Paso 1/8 — Actualizando repositorio (git pull)"
     cd "${PROJECT_ROOT}"
     info "Directorio: ${PROJECT_ROOT}"
     if git pull; then
@@ -127,7 +133,7 @@ fi
 # PASO 2 — Firewall
 # =============================================================================
 if ! $SKIP_FIREWALL; then
-    section "Paso 2/7 — Configurando firewall"
+    section "Paso 2/8 — Configurando firewall"
     FIREWALL_SCRIPT="${SCRIPTS_DIR}/security/firewall.sh"
     if [ -f "${FIREWALL_SCRIPT}" ]; then
         info "Ejecutando ${FIREWALL_SCRIPT}..."
@@ -144,7 +150,7 @@ fi
 # PASO 3 — RAID 1
 # =============================================================================
 if ! $SKIP_RAID; then
-    section "Paso 3/7 — Configurando RAID 1"
+    section "Paso 3/8 — Configurando RAID 1"
     RAID_SCRIPT="${SCRIPTS_DIR}/storage/setup_raid.sh"
     if [ -f "${RAID_SCRIPT}" ]; then
         info "Ejecutando ${RAID_SCRIPT}..."
@@ -161,7 +167,7 @@ fi
 # PASO 4 — LVM sobre RAID
 # =============================================================================
 if ! $SKIP_LVM; then
-    section "Paso 4/7 — Configurando LVM sobre RAID"
+    section "Paso 4/8 — Configurando LVM sobre RAID"
     LVM_SCRIPT="${SCRIPTS_DIR}/storage/setup_lvm.sh"
     if [ -f "${LVM_SCRIPT}" ]; then
         info "Ejecutando ${LVM_SCRIPT}..."
@@ -178,7 +184,7 @@ fi
 # PASO 5 — Usuarios y grupos
 # =============================================================================
 if ! $SKIP_USERS; then
-    section "Paso 5/7 — Creando usuarios y grupos"
+    section "Paso 5/8 — Creando usuarios y grupos"
     USERS_SCRIPT="${SCRIPTS_DIR}/users.sh"
     if [ -f "${USERS_SCRIPT}" ]; then
         info "Ejecutando ${USERS_SCRIPT}..."
@@ -195,7 +201,7 @@ fi
 # PASO 6 — Samba
 # =============================================================================
 if ! $SKIP_SAMBA; then
-    section "Paso 6/7 — Preparando host para Samba"
+    section "Paso 6/8 — Preparando host para Samba"
     SAMBA_SCRIPT="${SCRIPTS_DIR}/samba-setup.sh"
     if [ -f "${SAMBA_SCRIPT}" ]; then
         info "Ejecutando ${SAMBA_SCRIPT}..."
@@ -212,7 +218,7 @@ fi
 # PASO 7 — Levantar stack de contenedores
 # =============================================================================
 if ! $SKIP_STACK; then
-    section "Paso 7/7 — Levantando stack de contenedores"
+    section "Paso 7/8 — Levantando stack de contenedores"
     START_SCRIPT="${SCRIPTS_DIR}/start.sh"
     if [ -f "${START_SCRIPT}" ]; then
         info "Ejecutando ${START_SCRIPT} ${BUILD_FLAG}..."
@@ -223,6 +229,26 @@ if ! $SKIP_STACK; then
     fi
 else
     info "Omitiendo: stack (--skip-stack)"
+fi
+
+# =============================================================================
+# PASO 8 — Cron job de backup automático
+# =============================================================================
+if ! $SKIP_CRON; then
+    section "Paso 8/8 — Configurando cron job de backup"
+    BACKUP_SCRIPT="${SCRIPTS_DIR}/automation/backup.sh"
+    if [ -f "${BACKUP_SCRIPT}" ]; then
+        if ! crontab -l 2>/dev/null | grep -q "backup.sh"; then
+            (crontab -l 2>/dev/null; echo "0 2 * * * ${BACKUP_SCRIPT} >> /var/log/uv_backup.log 2>&1") | crontab -
+            log "Cron job de backup configurado — diario a las 02:00."
+        else
+            warn "Cron job de backup ya existe — omitiendo."
+        fi
+    else
+        warn "No se encontró ${BACKUP_SCRIPT} — omitiendo cron de backup."
+    fi
+else
+    info "Omitiendo: cron backup (--skip-cron)"
 fi
 
 # =============================================================================
@@ -241,6 +267,7 @@ echo "  Pasos ejecutados:"
 ! $SKIP_USERS    && echo "    ✓ usuarios/grupos"    || echo "    ✗ usuarios/grupos (omitido)"
 ! $SKIP_SAMBA    && echo "    ✓ Samba"              || echo "    ✗ Samba (omitido)"
 ! $SKIP_STACK    && echo "    ✓ stack Podman"        || echo "    ✗ stack Podman (omitido)"
+! $SKIP_CRON     && echo "    ✓ cron backup"           || echo "    ✗ cron backup (omitido)"
 echo ""
 echo -e "${YELLOW}  Verificar estado:${NC}"
 echo "    podman ps -a"
