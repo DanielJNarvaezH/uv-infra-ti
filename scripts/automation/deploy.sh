@@ -193,6 +193,26 @@ if ! $SKIP_USERS; then
     else
         err "No se encontró ${USERS_SCRIPT}"
     fi
+
+    # Instalar políticas sudoers en el host
+    POLICY_SCRIPT="${SCRIPTS_DIR}/security/install_uv_policies.sh"
+    PASS_SCRIPT="${SCRIPTS_DIR}/security/apply_password_policy.sh"
+
+    if [ -f "${POLICY_SCRIPT}" ]; then
+        info "Instalando políticas sudoers en host..."
+        bash "${POLICY_SCRIPT}"
+        log "Sudoers instaladas en host."
+    else
+        warn "No se encontró ${POLICY_SCRIPT} — omitiendo instalación de sudoers en host."
+    fi
+
+    if [ -f "${PASS_SCRIPT}" ]; then
+        info "Aplicando política de contraseñas en host..."
+        bash "${PASS_SCRIPT}"
+        log "Política de contraseñas aplicada en host."
+    else
+        warn "No se encontró ${PASS_SCRIPT} — omitiendo política de contraseñas en host."
+    fi
 else
     info "Omitiendo: usuarios (--skip-users)"
 fi

@@ -30,6 +30,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY config/uv_policies.sudoers /etc/sudoers.d/uv_policies
 RUN chmod 0440 /etc/sudoers.d/uv_policies && visudo -cf /etc/sudoers.d/uv_policies
 
+# Copiar script de política de contraseñas y ejecutarlo
+COPY ./scripts/security/apply_password_policy.sh /usr/local/bin/apply_password_policy.sh
+RUN chmod +x /usr/local/bin/apply_password_policy.sh && /usr/local/bin/apply_password_policy.sh
+
 # Llave pública SSH — se pasa en tiempo de build, nunca se hardcodea
 # Uso: podman build --build-arg SSH_PUBLIC_KEY="$(cat ~/.ssh/id_rsa.pub)" ...
 ARG SAMBA_UID=1050

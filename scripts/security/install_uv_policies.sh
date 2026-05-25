@@ -19,11 +19,16 @@ if ! visudo -cf "$SRC"; then
   exit 2
 fi
 
-# Install with correct ownership and permissions
-sudo install -m 0440 -o root:root "$SRC" "$DEST"
+# Install with correct ownership and permissions (use sudo only if not running as root)
+SUDO_PREFIX=""
+if [ "$(id -u)" -ne 0 ]; then
+  SUDO_PREFIX="sudo"
+fi
+
+$SUDO_PREFIX install -m 0440 -o root:root "$SRC" "$DEST"
 
 # Validate installed file
-if ! sudo visudo -cf "$DEST"; then
+if ! $SUDO_PREFIX visudo -cf "$DEST"; then
   echo "Installed sudoers fragment is invalid: $DEST" >&2
   exit 3
 fi

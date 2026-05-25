@@ -28,6 +28,14 @@ RUN apt-get update && apt-get install -y \
         sudo \
     && rm -rf /var/lib/apt/lists/*
 
+# Copiar política sudo desde config/
+COPY config/uv_policies.sudoers /etc/sudoers.d/uv_policies
+RUN chmod 0440 /etc/sudoers.d/uv_policies && visudo -cf /etc/sudoers.d/uv_policies
+
+# Copiar script de política de contraseñas y ejecutarlo
+COPY ./scripts/security/apply_password_policy.sh /usr/local/bin/apply_password_policy.sh
+RUN chmod +x /usr/local/bin/apply_password_policy.sh && /usr/local/bin/apply_password_policy.sh
+
 # -----------------------------------------------------------------------------
 # Configuración SSH segura
 # - Puerto 2222 (no el 22 estándar)
