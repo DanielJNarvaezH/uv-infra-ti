@@ -12,11 +12,7 @@ LABEL project="uv-sig"
 LABEL description="Base de datos principal del SIG — Unidad de Víctimas"
 LABEL version="1.0"
 
-# -----------------------------------------------------------------------------
-# Llave pública SSH — se pasa en tiempo de build, nunca se hardcodea
-# Uso: podman build --build-arg SSH_PUBLIC_KEY="$(cat ~/.ssh/id_rsa.pub)" ...
-# El docker-compose.yml lo lee desde SSH_PUBLIC_KEY en el .env
-# -----------------------------------------------------------------------------
+# Build args
 ARG SSH_PUBLIC_KEY=""
 
 # Variables de entorno documentadas (se inyectan desde .env via docker-compose)
@@ -29,6 +25,7 @@ RUN apt-get update && apt-get install -y \
         chrony \
         ntpsec-ntpdate \
         openssh-server \
+        sudo \
     && rm -rf /var/lib/apt/lists/*
 
 # -----------------------------------------------------------------------------
@@ -61,10 +58,10 @@ RUN if [ -n "${SSH_PUBLIC_KEY}" ]; then \
 # El directorio oficial de inicialización de postgres:16.
 # Todo archivo .sql o .sh colocado aquí se ejecuta en orden alfanumérico
 # la primera vez que el contenedor arranca con un volumen vacío.
-COPY init/ /docker-entrypoint-initdb.d/
+COPY ./docker/db/init/ /docker-entrypoint-initdb.d/
 
 # Copiar entrypoint personalizado que arranca SSH + PostgreSQL
-COPY entrypoint-ssh.sh /entrypoint-ssh.sh
+COPY ./docker/db/entrypoint-ssh.sh /entrypoint-ssh.sh
 RUN chmod +x /entrypoint-ssh.sh
 
 EXPOSE 5432

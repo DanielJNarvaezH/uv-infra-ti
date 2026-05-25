@@ -1,0 +1,32 @@
+# =============================================================================
+# .dockerignore — Archivos excluidos de build contexts
+# =============================================================================
+# Seguridad: nunca incluir .env, claves privadas, credenciales
+.env
+.env.local
+.env.*.local
+.git
+.gitignore
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Datos y volúmenes
+data/
+/mnt/
+*.iso
+
+# Documentación y desarrollo
+docs/
+*.md
+.github/
+.vscode/
+.idea/
+
+# Archivos temporales
+*.log
+*.tmp
+node_modules/
+__pycache__/
+.pytest_cache/

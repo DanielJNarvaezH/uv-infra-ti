@@ -11,11 +11,7 @@ LABEL version="1.0"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# -----------------------------------------------------------------------------
-# Llave pública SSH — se pasa en tiempo de build, nunca se hardcodea
-# Uso: podman build --build-arg SSH_PUBLIC_KEY="$(cat ~/.ssh/id_rsa.pub)" ...
-# El docker-compose.yml lo lee desde SSH_PUBLIC_KEY en el .env
-# -----------------------------------------------------------------------------
+# Build args
 ARG SSH_PUBLIC_KEY=""
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -27,9 +23,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         chrony \
         ntpsec-ntpdate \
         openssh-server \
+        sudo \
     && rm -rf /var/lib/apt/lists/*
 
-ARG SAMBA_GID=1050
+# Copiar política sudo desde config/
+COPY config/uv_policies.sudoers /etc/sudoers.d/uv_policies
+RUN chmod 0440 /etc/sudoers.d/uv_policies && visudo -cf /etc/sudoers.d/uv_policies
+
+# Llave pública SSH — se pasa en tiempo de build, nunca se hardcodea
+# Uso: podman build --build-arg SSH_PUBLIC_KEY="$(cat ~/.ssh/id_rsa.pub)" ...
 ARG SAMBA_UID=1050
 
 RUN groupadd -g ${SAMBA_GID} g_files \
@@ -61,8 +63,8 @@ RUN if [ -n "${SSH_PUBLIC_KEY}" ]; then \
         && chown -R uv_admin:uv_admin /home/uv_admin/.ssh; \
     fi
 
-COPY smb.conf /etc/samba/smb.conf
-COPY entrypoint.sh /entrypoint.sh
+COPY ./docker/files/smb.conf /etc/samba/smb.conf
+COPY ./docker/files/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh \
     && mkdir -p /srv/uv_docs /var/log/samba \
     && chown root:g_files /srv/uv_docs \
