@@ -75,6 +75,12 @@ services:
   # ---------------------------------------------------------------------------
   # srv-db-01 — Servidor de Base de Datos (VLAN 10 — 10.0.10.2)
   # SSH: puerto 2222 — usuario uv_dbadmin — solo llave pública
+  # ALM-3: Almacenamiento persistente en /mnt/uv_db (LVM lv_db sobre RAID 1)
+  #  El directorio /mnt/uv_db debe existir en el host con los permisos
+  #  correctos antes de levantar este servicio:
+  #    sudo mkdir -p /mnt/uv_db
+  #    sudo chown 999:999 /mnt/uv_db   # UID/GID del usuario postgres en la imagen
+
   # ---------------------------------------------------------------------------
   srv-db-01:
     build:
@@ -97,8 +103,13 @@ services:
       TZ: ${TZ}
       PGTZ: ${PGTZ}
     volumes:
-      - pgdata:/var/lib/postgresql/data:Z
-      - ./db/init:/docker-entrypoint-initdb.d:ro,Z
+      - type: bind
+        source: /mnt/uv_db
+        target: /var/lib/postgresql/data
+      - type: bind
+        source: ./db/init
+        target: /docker-entrypoint-initdb.d
+        read_only: true
     networks:
       vlan10:
         ipv4_address: 10.0.10.2
@@ -122,6 +133,13 @@ services:
   # srv-files-01 — Servidor de Archivos (VLAN 10 — 10.0.10.3)
   # Samba SMB/CIFS | Share: /srv/uv_docs | Solo LAN, bloqueado desde DMZ
   # SSH: puerto 2222 interno → 2223 en host — usuario uv_admin — solo llave pública
+  #
+  # ALM-3: Almacenamiento persistente en /mnt/uv_files (LVM lv_files sobre RAID 1)
+  #   El directorio /mnt/uv_files debe existir en el host:
+  #     sudo mkdir -p /mnt/uv_files
+  #     sudo chown root:1050 /mnt/uv_files   # GID 1050 = g_files
+  #     sudo chmod 2770 /mnt/uv_files
+
   # ---------------------------------------------------------------------------
   srv-files-01:
     build:
@@ -145,7 +163,9 @@ services:
       SAMBA_GROUP: g_files
       SAMBA_SHARE_PATH: /srv/uv_docs
     volumes:
-      - samba_data:/srv/uv_docs:Z
+      - type: bind
+        source: /mnt/uv_files
+        target: /srv/uv_docs
     networks:
       vlan10:
         ipv4_address: 10.0.10.3
@@ -466,10 +486,3 @@ networks:
     name: backend_phpfpm
     driver: bridge
     internal: true
-
-# =============================================================================
-# Volúmenes — para persistencia de datos y configuración
-# =============================================================================
-volumes:
-  pgdata:
-  samba_data:
