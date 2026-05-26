@@ -14,7 +14,7 @@ services:
   # ---------------------------------------------------------------------------
   srv-ntp-01:
     build:
-      context: ./docker/ntp/
+      context: ./ntp/
       dockerfile: Dockerfile
     container_name: srv-ntp-01
     hostname: srv-ntp-01
@@ -352,7 +352,7 @@ services:
   # ---------------------------------------------------------------------------
   srv-dns-01:
     build:
-      context: ./docker/dns
+      context: ./dns
       dockerfile: Dockerfile
     container_name: srv-dns-01
     hostname: srv-dns-01
@@ -381,7 +381,7 @@ services:
   # ---------------------------------------------------------------------------
   srv-smtp-01:
     build:
-      context: ./docker/smtp
+      context: ./smtp
       dockerfile: Dockerfile
     container_name: srv-smtp-01
     hostname: srv-smtp-01
@@ -420,7 +420,7 @@ services:
   # ---------------------------------------------------------------------------
   srv-dhcp-01:
     build:
-      context: ./docker/dhcp
+      context: ./dhcp
       dockerfile: Dockerfile
     container_name: srv-dhcp-01
     hostname: srv-dhcp-01
