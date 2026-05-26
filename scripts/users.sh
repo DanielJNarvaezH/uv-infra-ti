@@ -64,6 +64,7 @@ crear_usuarios() {
     # uv_admin — administrador general con shell de login
     if ! id uv_admin >/dev/null 2>&1; then
         useradd -m -u 2001 -g g_admins -s /bin/bash uv_admin
+        chage -M 90 -m 7 -W 14 uv_admin 2>/dev/null || true
         log "  ✓ uv_admin (UID 2001) creado — grupo principal: g_admins"
     else
         warn "  ⚠ uv_admin ya existe, omitiendo creación"
@@ -72,6 +73,7 @@ crear_usuarios() {
     # uv_webmaster — administrador web con shell de login
     if ! id uv_webmaster >/dev/null 2>&1; then
         useradd -m -u 2002 -g g_web -s /bin/bash uv_webmaster
+        chage -M 90 -m 7 -W 14 uv_webmaster 2>/dev/null || true
         log "  ✓ uv_webmaster (UID 2002) creado — grupo principal: g_web"
     else
         warn "  ⚠ uv_webmaster ya existe, omitiendo creación"
@@ -80,6 +82,7 @@ crear_usuarios() {
     # uv_dbadmin — administrador de base de datos con shell de login
     if ! id uv_dbadmin >/dev/null 2>&1; then
         useradd -m -u 2003 -g g_db -s /bin/bash uv_dbadmin
+        chage -M 90 -m 7 -W 14 uv_dbadmin 2>/dev/null || true
         log "  ✓ uv_dbadmin (UID 2003) creado — grupo principal: g_db"
     else
         warn "  ⚠ uv_dbadmin ya existe, omitiendo creación"

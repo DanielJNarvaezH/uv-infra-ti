@@ -104,7 +104,7 @@ podman exec srv-db-01 journalctl -u sshd 2>/dev/null || \
 | `PasswordAuthentication` | `no` | Solo llaves — elimina ataques de fuerza bruta |
 | `PubkeyAuthentication` | `yes` | Autenticación por llave pública habilitada |
 | `ChallengeResponseAuthentication` | `no` | Deshabilitado para mayor seguridad |
-| `AllowUsers` | `uv_dbadmin` / `uv_admin` / `uv_webmaster` | Lista blanca explícita de usuarios permitidos |
+| `AllowUsers` | `uv_dbadmin` (srv-db-01) / `uv_admin uv_webmaster` (srv-files-01) | Lista blanca explícita de usuarios permitidos |
 
 ---
 
@@ -113,7 +113,7 @@ podman exec srv-db-01 journalctl -u sshd 2>/dev/null || \
 | Contenedor | IP interna | Puerto host | Puerto contenedor | Usuario SSH |
 |------------|------------|-------------|-------------------|-------------|
 | srv-db-01 | 10.0.10.2 | 2222 | 2222 | uv_dbadmin |
-| srv-files-01 | 10.0.10.3 | 2223 | 2222 | uv_admin |
+| srv-files-01 | 10.0.10.3 | 2223 | 2222 | uv_admin, uv_webmaster |
 
 > Los puertos 2222 y 2223 en el host son solo para desarrollo local.  
 > En producción el acceso SSH sería directo por IP interna desde VLAN 20.

@@ -25,7 +25,7 @@ if [ "$(id -u)" -ne 0 ]; then
   SUDO_PREFIX="sudo"
 fi
 
-$SUDO_PREFIX install -m 0440 -o root:root "$SRC" "$DEST"
+$SUDO_PREFIX install -m 0440 -o root -g root "$SRC" "$DEST"
 
 # Validate installed file
 if ! $SUDO_PREFIX visudo -cf "$DEST"; then
