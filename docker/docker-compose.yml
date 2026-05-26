@@ -84,7 +84,7 @@ services:
   # ---------------------------------------------------------------------------
   srv-db-01:
     build:
-      context: .
+      context: ../
       dockerfile: docker/db/Dockerfile
       args:
         SSH_PUBLIC_KEY: ${SSH_PUBLIC_KEY:-}
@@ -143,7 +143,7 @@ services:
   # ---------------------------------------------------------------------------
   srv-files-01:
     build:
-      context: .
+      context: ../
       dockerfile: docker/files/Dockerfile
       args:
         SAMBA_GID: ${SAMBA_GID:-1050}
