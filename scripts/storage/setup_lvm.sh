@@ -146,21 +146,30 @@ done
 
 df -h /mnt/uv_db /mnt/uv_files /mnt/uv_logs
 
-# ── Configurar /etc/fstab ─────────────────────────────────────────────────────
-section "7. Configurando /etc/fstab para persistencia"
+# ── /etc/fstab — NO se modifica automáticamente ──────────────────────────────
+section "7. Nota sobre persistencia en /etc/fstab"
 
-# Eliminar entradas previas del VG si existen
-sed -i "/\/dev\/${VG_NAME}\//d" /etc/fstab
-sed -i "/uv_vg-lv_/d" /etc/fstab
+# ⚠️  IMPORTANTE: Este script NO modifica /etc/fstab intencionalmente.
+#
+# Agregar los LVs al fstab en una máquina HOST REAL puede bloquear el arranque
+# si los dispositivos loop o el RAID no están disponibles al inicio del sistema
+# (lo cual es el caso aquí, ya que los discos virtuales viven en /tmp).
+#
+# Este script está diseñado para ENTORNOS VIRTUALES o EJECUCIÓN MANUAL.
+# Los montajes son temporales y se pierden al reiniciar — eso es correcto.
+#
+# Si deseas montaje persistente en una VM o entorno controlado,
+# agrega manualmente estas líneas a /etc/fstab:
+#
+#   /dev/uv_vg/lv_db     /mnt/uv_db     ext4  defaults,nofail  0  2
+#   /dev/uv_vg/lv_files  /mnt/uv_files  ext4  defaults,nofail  0  2
+#   /dev/uv_vg/lv_logs   /mnt/uv_logs   ext4  defaults,nofail  0  2
+#
+# Nota: usar la opción 'nofail' para que el sistema arranque aunque
+# los dispositivos no estén disponibles.
 
-for lv in lv_db lv_files lv_logs; do
-    mp="${LV_MNT[$lv]}"
-    entry="/dev/${VG_NAME}/${lv}  ${mp}  ext4  defaults  0  2"
-    echo "${entry}" >> /etc/fstab
-    log "fstab: ${entry}"
-done
-
-log "/etc/fstab actualizado."
+warn "Montajes activos solo para esta sesión — no se modifica /etc/fstab"
+warn "Para persistencia manual ver comentario en el script (sección 7)"
 
 # ── Documentación final ───────────────────────────────────────────────────────
 section "8. Documentación — pvdisplay / vgdisplay / lvdisplay"
