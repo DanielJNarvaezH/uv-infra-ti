@@ -233,3 +233,26 @@ echo ""
 echo "  Log: ${LOG_FILE}"
 echo ""
 df -h /mnt/uv_logs
+
+# =============================================================================
+# POST-BACKUP — Ejecutar monitor para registrar estado del sistema tras el respaldo
+# =============================================================================
+MONITOR_SCRIPT="${PROJECT_DIR}/scripts/automation/monitor.sh"
+if [[ -f "${MONITOR_SCRIPT}" ]]; then
+    info "Ejecutando monitor post-backup..."
+    {
+        echo ""
+        echo "========================================================"
+        echo "  MONITOR POST-BACKUP — $(date '+%Y-%m-%d %H:%M:%S')"
+        echo "========================================================"
+    } >> "${LOG_FILE}"
+
+    # --quiet: no imprime en terminal (ya está en el log de backup)
+    # --no-smtp: no reenviar alertas SMTP (backup.sh ya las genera si las hay)
+    PROJECT_DIR="${PROJECT_DIR}" bash "${MONITOR_SCRIPT}" --quiet --no-smtp \
+        >> "${LOG_FILE}" 2>&1 \
+        && ok "Monitor post-backup ejecutado — estado registrado en ${LOG_FILE}" \
+        || warn "Monitor post-backup finalizó con advertencias — revisar ${LOG_FILE}"
+else
+    warn "monitor.sh no encontrado en ${MONITOR_SCRIPT} — omitiendo monitoreo post-backup"
+fi
