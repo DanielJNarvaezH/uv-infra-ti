@@ -159,7 +159,7 @@ if ! $SKIP_RAID; then
     RAID_SCRIPT="${SCRIPTS_DIR}/storage/setup_raid.sh"
     if [ -f "${RAID_SCRIPT}" ]; then
         info "Ejecutando ${RAID_SCRIPT}..."
-        bash "${RAID_SCRIPT}" 500
+        bash "${RAID_SCRIPT}"
         log "RAID 1 configurado."
     else
         err "No se encontró ${RAID_SCRIPT}"
