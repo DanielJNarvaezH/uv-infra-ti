@@ -103,11 +103,7 @@ services:
       TZ: ${TZ}
       PGTZ: ${PGTZ}
     volumes:
-      - type: bind
-        source: /mnt/uv_db
-        target: /var/lib/postgresql/data
-        bind:
-          selinux: Z
+      - /mnt/uv_db:/var/lib/postgresql/data:Z
       - type: bind
         source: ./db/init
         target: /docker-entrypoint-initdb.d
@@ -165,11 +161,7 @@ services:
       SAMBA_GROUP: g_files
       SAMBA_SHARE_PATH: /srv/uv_docs
     volumes:
-      - type: bind
-        source: /mnt/uv_files
-        target: /srv/uv_docs
-        bind:
-          selinux: Z
+      - /mnt/uv_files:/srv/uv_docs:Z
     networks:
       vlan10:
         ipv4_address: 10.0.10.3
@@ -334,16 +326,8 @@ services:
       - "8443:443"
       - "8081:81"
     volumes:
-      - type: bind
-        source: ./web/proxy/data
-        target: /data
-        bind:
-          selinux: Z
-      - type: bind
-        source: ./web/proxy/letsencrypt
-        target: /etc/letsencrypt
-        bind:
-          selinux: Z
+      - ./web/proxy/data:/data:Z
+      - ./web/proxy/letsencrypt:/etc/letsencrypt:Z
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:81/ >/dev/null || exit 1"]
       interval: 30s
