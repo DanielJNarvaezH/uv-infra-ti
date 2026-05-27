@@ -9,19 +9,19 @@
 #   Configura un RAID 1 (espejo) sobre dispositivos de bloque reales.
 #   Los discos se pasan como argumentos — mínimo 2 para RAID 1.
 #
+#   Este script SOLO crea el RAID. La configuración de LVM, formateo
+#   y montaje se realiza con setup_lvm.sh (ALM-2).
+#
 # USO:
 #   sudo bash scripts/storage/setup_raid.sh /dev/sdb /dev/sdc
 #   sudo bash scripts/storage/setup_raid.sh /dev/nvme1n1 /dev/nvme2n1
 #
 # REQUISITOS:
-#   - mdadm     : sudo apt install mdadm
-#   - lvm2      : sudo apt install lvm2
+#   - mdadm : sudo apt install mdadm
 #   - Ejecutar como root o con sudo
 #
 # RESULTADO FINAL:
-#   /dev/md0                → RAID 1 (mirror de los discos proporcionados)
-#   /dev/vg_uv/lv_db        → Logical Volume sobre el RAID
-#   /mnt/uv_db              → punto de montaje
+#   /dev/md0 → RAID 1 (mirror de los discos proporcionados)
 #
 # =============================================================================
 # JUSTIFICACIÓN TÉCNICA — ¿Por qué RAID 1 para la BD de la Unidad de Víctimas?
@@ -88,19 +88,13 @@ done
 
 # ── Parámetros ────────────────────────────────────────────────────────────────
 RAID_DEV="/dev/md0"
-VG_NAME="vg_uv"
-LV_NAME="lv_db"
-MOUNT_POINT="/mnt/uv_db"
 
 # ── Verificar dependencias ─────────────────────────────────────────────────────
 info "Verificando dependencias..."
-for pkg_cmd in "mdadm:mdadm" "pvcreate:lvm2" "mkfs.ext4:e2fsprogs"; do
-    cmd="${pkg_cmd%%:*}"; pkg="${pkg_cmd##*:}"
-    if ! command -v "$cmd" &>/dev/null; then
-        warn "$cmd no encontrado — instalando $pkg..."
-        apt-get install -y --no-install-recommends "$pkg" -q
-    fi
-done
+if ! command -v mdadm &>/dev/null; then
+    warn "mdadm no encontrado — instalando..."
+    apt-get install -y --no-install-recommends mdadm -q
+fi
 log "Dependencias verificadas."
 
 # ── Advertencia de destrucción de datos ────────────────────────────────────────
@@ -121,11 +115,11 @@ fi
 
 # ── Limpiar estado previo (idempotente) ────────────────────────────────────────
 info "Limpiando estado previo si existe..."
-mountpoint -q "${MOUNT_POINT}" 2>/dev/null && umount "${MOUNT_POINT}" && warn "Desmontado ${MOUNT_POINT}"
-lvs "${VG_NAME}/${LV_NAME}" &>/dev/null && lvremove -f "/dev/${VG_NAME}/${LV_NAME}" && warn "LV eliminado"
-vgs "${VG_NAME}" &>/dev/null            && vgremove -f "${VG_NAME}"                 && warn "VG eliminado"
-pvs "${RAID_DEV}" &>/dev/null           && pvremove -f "${RAID_DEV}"                && warn "PV eliminado"
-[[ -b "${RAID_DEV}" ]]                  && mdadm --stop "${RAID_DEV}" 2>/dev/null   && warn "RAID detenido"
+
+# Detener RAID existente sobre el dispositivo md0
+if [[ -b "${RAID_DEV}" ]]; then
+    mdadm --stop "${RAID_DEV}" 2>/dev/null && warn "RAID ${RAID_DEV} detenido"
+fi
 
 # Detener RAID existente que use alguno de los discos
 for disk in "${DISKS[@]}"; do
@@ -173,32 +167,10 @@ mdadm --detail --scan >> /etc/mdadm/mdadm.conf 2>/dev/null || \
 update-initramfs -u &>/dev/null || true
 log "Configuración de mdadm actualizada."
 
-# ── LVM sobre RAID ────────────────────────────────────────────────────────────
-info "Configurando LVM sobre ${RAID_DEV}..."
-
-pvcreate "${RAID_DEV}"
-log "Physical Volume: ${RAID_DEV}"
-
-vgcreate "${VG_NAME}" "${RAID_DEV}"
-log "Volume Group: ${VG_NAME}"
-
-# 90% del espacio libre — margen para snapshots futuros
-lvcreate --extents 90%FREE --name "${LV_NAME}" "${VG_NAME}"
-log "Logical Volume: /dev/${VG_NAME}/${LV_NAME}"
-
-# ── Formatear y montar ─────────────────────────────────────────────────────────
-info "Formateando con ext4..."
-mkfs.ext4 -F -L "uv_db_data" "/dev/${VG_NAME}/${LV_NAME}"
-
-info "Montando en ${MOUNT_POINT}..."
-mkdir -p "${MOUNT_POINT}"
-mount "/dev/${VG_NAME}/${LV_NAME}" "${MOUNT_POINT}"
-log "Montado correctamente."
-
 # ── Resumen ────────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║       RAID 1 + LVM — Configuración completada       ║${NC}"
+echo -e "${GREEN}║            RAID 1 — Configuración completada         ║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════════════╝${NC}"
 echo ""
 i=0
@@ -206,15 +178,10 @@ for disk in "${DISKS[@]}"; do
     echo "  Disco $((++i))          : ${disk}"
 done
 echo "  RAID Device      : ${RAID_DEV}  (RAID 1 — mirror, ${#DISKS[@]} discos)"
-echo "  Volume Group     : ${VG_NAME}"
-echo "  Logical Volume   : /dev/${VG_NAME}/${LV_NAME}"
-echo "  Punto de montaje : ${MOUNT_POINT}"
 echo ""
-df -h "${MOUNT_POINT}"
+echo -e "${YELLOW}  Siguiente paso — ejecutar setup_lvm.sh para crear LVM sobre el RAID:${NC}"
+echo "    sudo bash scripts/storage/setup_lvm.sh"
 echo ""
 echo -e "${YELLOW}  Para verificar el RAID en cualquier momento:${NC}"
 echo "    cat /proc/mdstat"
 echo "    sudo mdadm --detail ${RAID_DEV}"
-echo ""
-echo -e "${YELLOW}  Para hacer el montaje persistente agregar a /etc/fstab:${NC}"
-echo "  /dev/${VG_NAME}/${LV_NAME}  ${MOUNT_POINT}  ext4  defaults  0  2"
