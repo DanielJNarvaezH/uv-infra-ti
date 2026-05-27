@@ -1,18 +1,17 @@
 #!/usr/bin/env bash
 # =============================================================================
-# setup_raid.sh — ALM-1: Simulación de RAID 1 con discos virtuales (loop)
+# setup_raid.sh — ALM-1: Configuración de RAID 1 con discos físicos
 # Infraestructura TI — Unidad para la Atención y Reparación Integral a las Víctimas
 # Universidad del Quindío — Semestre 2026-1
 # =============================================================================
 #
 # DESCRIPCIÓN:
-#   Simula un RAID 1 (espejo) usando dos archivos imagen montados como
-#   dispositivos loop. No requiere discos físicos adicionales — funciona
-#   en cualquier máquina Linux del equipo.
+#   Configura un RAID 1 (espejo) sobre dispositivos de bloque reales.
+#   Los discos se pasan como argumentos — mínimo 2 para RAID 1.
 #
 # USO:
-#   sudo bash scripts/storage/setup_raid.sh           # discos de 500 MB
-#   sudo bash scripts/storage/setup_raid.sh 1024      # discos de 1 GB
+#   sudo bash scripts/storage/setup_raid.sh /dev/sdb /dev/sdc
+#   sudo bash scripts/storage/setup_raid.sh /dev/nvme1n1 /dev/nvme2n1
 #
 # REQUISITOS:
 #   - mdadm     : sudo apt install mdadm
@@ -20,8 +19,7 @@
 #   - Ejecutar como root o con sudo
 #
 # RESULTADO FINAL:
-#   /dev/loop0, /dev/loop1  → discos virtuales (archivos imagen)
-#   /dev/md0                → RAID 1 (mirror de loop0 + loop1)
+#   /dev/md0                → RAID 1 (mirror de los discos proporcionados)
 #   /dev/vg_uv/lv_db        → Logical Volume sobre el RAID
 #   /mnt/uv_db              → punto de montaje
 #
@@ -69,21 +67,32 @@ err()  { echo -e "${RED}[ERR]${NC}  $*" >&2; }
 
 # ── Verificar root ────────────────────────────────────────────────────────────
 if [[ $EUID -ne 0 ]]; then
-    err "Ejecutar como root: sudo bash $0"
+    err "Ejecutar como root: sudo bash $0 /dev/sdb /dev/sdc"
     exit 1
 fi
 
+# ── Validar argumentos ────────────────────────────────────────────────────────
+if [[ $# -lt 2 ]]; then
+    err "Se requieren al menos 2 discos para RAID 1."
+    err "Uso: sudo bash $0 /dev/sdb /dev/sdc [/dev/sdd ...]"
+    exit 1
+fi
+
+DISKS=("$@")
+for disk in "${DISKS[@]}"; do
+    if [[ ! -b "$disk" ]]; then
+        err "$disk no es un dispositivo de bloque válido."
+        exit 1
+    fi
+done
+
 # ── Parámetros ────────────────────────────────────────────────────────────────
-DISK_SIZE_MB=${1:-500}
-IMG_DIR="/tmp/uv_raid_disks"
-IMG_DISK0="${IMG_DIR}/disk0.img"
-IMG_DISK1="${IMG_DIR}/disk1.img"
 RAID_DEV="/dev/md0"
 VG_NAME="vg_uv"
 LV_NAME="lv_db"
 MOUNT_POINT="/mnt/uv_db"
 
-# ── Verificar dependencias ────────────────────────────────────────────────────
+# ── Verificar dependencias ─────────────────────────────────────────────────────
 info "Verificando dependencias..."
 for pkg_cmd in "mdadm:mdadm" "pvcreate:lvm2" "mkfs.ext4:e2fsprogs"; do
     cmd="${pkg_cmd%%:*}"; pkg="${pkg_cmd##*:}"
@@ -94,50 +103,75 @@ for pkg_cmd in "mdadm:mdadm" "pvcreate:lvm2" "mkfs.ext4:e2fsprogs"; do
 done
 log "Dependencias verificadas."
 
-# ── Limpiar estado previo (idempotente) ───────────────────────────────────────
+# ── Advertencia de destrucción de datos ────────────────────────────────────────
+echo ""
+warn "═══════════════════════════════════════════════════════"
+warn "  ¡ATENCIÓN! Los siguientes discos serán LIMPIADOS:"
+for disk in "${DISKS[@]}"; do
+    warn "    → $disk"
+done
+warn "  Se borrará toda la información existente en ellos."
+warn "═══════════════════════════════════════════════════════"
+echo ""
+read -rp "¿Continuar? (sí/no): " confirm
+if [[ "$confirm" != "sí" && "$confirm" != "sí" && "$confirm" != "si" && "$confirm" != "SI" ]]; then
+    err "Operación cancelada por el usuario."
+    exit 1
+fi
+
+# ── Limpiar estado previo (idempotente) ────────────────────────────────────────
 info "Limpiando estado previo si existe..."
 mountpoint -q "${MOUNT_POINT}" 2>/dev/null && umount "${MOUNT_POINT}" && warn "Desmontado ${MOUNT_POINT}"
 lvs "${VG_NAME}/${LV_NAME}" &>/dev/null && lvremove -f "/dev/${VG_NAME}/${LV_NAME}" && warn "LV eliminado"
 vgs "${VG_NAME}" &>/dev/null            && vgremove -f "${VG_NAME}"                 && warn "VG eliminado"
 pvs "${RAID_DEV}" &>/dev/null           && pvremove -f "${RAID_DEV}"                && warn "PV eliminado"
 [[ -b "${RAID_DEV}" ]]                  && mdadm --stop "${RAID_DEV}" 2>/dev/null   && warn "RAID detenido"
-for img in "${IMG_DISK0}" "${IMG_DISK1}"; do
-    for loop in $(losetup -j "$img" 2>/dev/null | cut -d: -f1); do
-        losetup -d "$loop" && warn "Loop liberado: $loop"
-    done
+
+# Detener RAID existente que use alguno de los discos
+for disk in "${DISKS[@]}"; do
+    existing_md=$(mdadm --examine "$disk" 2>/dev/null | grep -oP '/dev/md\d+' | head -1 || true)
+    if [[ -n "$existing_md" ]]; then
+        mdadm --stop "$existing_md" 2>/dev/null && warn "RAID existente detenido: $existing_md"
+    fi
 done
 
-# ── Crear imágenes de disco ───────────────────────────────────────────────────
-info "Creando discos virtuales de ${DISK_SIZE_MB} MB cada uno en ${IMG_DIR}..."
-mkdir -p "${IMG_DIR}"
-dd if=/dev/zero of="${IMG_DISK0}" bs=1M count="${DISK_SIZE_MB}" status=none
-dd if=/dev/zero of="${IMG_DISK1}" bs=1M count="${DISK_SIZE_MB}" status=none
-log "Imágenes creadas: disk0.img y disk1.img (${DISK_SIZE_MB} MB c/u)"
+# Limpiar superbloques RAID previos en los discos
+for disk in "${DISKS[@]}"; do
+    mdadm --zero-superblock "$disk" 2>/dev/null && warn "Superbloque limpiado en $disk" || true
+done
 
-# ── Montar como loop devices ──────────────────────────────────────────────────
-info "Asociando loop devices..."
-LOOP0=$(losetup --find --show "${IMG_DISK0}")
-LOOP1=$(losetup --find --show "${IMG_DISK1}")
-log "Loop devices: ${LOOP0} → disk0.img | ${LOOP1} → disk1.img"
+# ── Borrar tablas de particiones ───────────────────────────────────────────────
+info "Borrando tablas de particiones existentes..."
+for disk in "${DISKS[@]}"; do
+    wipefs -a "$disk" &>/dev/null && warn "Firmas borradas en $disk" || true
+done
+log "Discos limpios."
 
 # ── Crear RAID 1 ──────────────────────────────────────────────────────────────
-info "Creando RAID 1 con mdadm..."
+info "Creando RAID 1 con ${#DISKS[@]} disco(s)..."
 mdadm --create "${RAID_DEV}" \
       --level=1 \
-      --raid-devices=2 \
+      --raid-devices="${#DISKS[@]}" \
       --metadata=1.2 \
       --run \
-      "${LOOP0}" "${LOOP1}" <<< "yes"
+      "${DISKS[@]}" <<< "yes"
 
 sleep 2
-log "RAID 1 creado en ${RAID_DEV}"
+log "RAID 1 creado en ${RAID_DEV} con ${#DISKS[@]} disco(s)"
 
-# ── Verificar RAID ────────────────────────────────────────────────────────────
+# ── Verificar RAID ─────────────────────────────────────────────────────────────
 info "Estado del RAID (/proc/mdstat):"
 echo "────────────────────────────────────"
 cat /proc/mdstat
 echo "────────────────────────────────────"
 mdadm --detail "${RAID_DEV}"
+
+# ── Guardar configuración de mdadm ────────────────────────────────────────────
+info "Guardando configuración de mdadm..."
+mdadm --detail --scan >> /etc/mdadm/mdadm.conf 2>/dev/null || \
+    mdadm --detail --scan >> /etc/mdadm.conf 2>/dev/null || true
+update-initramfs -u &>/dev/null || true
+log "Configuración de mdadm actualizada."
 
 # ── LVM sobre RAID ────────────────────────────────────────────────────────────
 info "Configurando LVM sobre ${RAID_DEV}..."
@@ -152,7 +186,7 @@ log "Volume Group: ${VG_NAME}"
 lvcreate --extents 90%FREE --name "${LV_NAME}" "${VG_NAME}"
 log "Logical Volume: /dev/${VG_NAME}/${LV_NAME}"
 
-# ── Formatear y montar ────────────────────────────────────────────────────────
+# ── Formatear y montar ─────────────────────────────────────────────────────────
 info "Formateando con ext4..."
 mkfs.ext4 -F -L "uv_db_data" "/dev/${VG_NAME}/${LV_NAME}"
 
@@ -161,15 +195,17 @@ mkdir -p "${MOUNT_POINT}"
 mount "/dev/${VG_NAME}/${LV_NAME}" "${MOUNT_POINT}"
 log "Montado correctamente."
 
-# ── Resumen ───────────────────────────────────────────────────────────────────
+# ── Resumen ────────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║       RAID 1 + LVM — Configuración completada       ║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════════════╝${NC}"
 echo ""
-echo "  Disco virtual 0 : ${IMG_DISK0} → ${LOOP0}"
-echo "  Disco virtual 1 : ${IMG_DISK1} → ${LOOP1}"
-echo "  RAID Device      : ${RAID_DEV}  (RAID 1 — mirror)"
+i=0
+for disk in "${DISKS[@]}"; do
+    echo "  Disco $((++i))          : ${disk}"
+done
+echo "  RAID Device      : ${RAID_DEV}  (RAID 1 — mirror, ${#DISKS[@]} discos)"
 echo "  Volume Group     : ${VG_NAME}"
 echo "  Logical Volume   : /dev/${VG_NAME}/${LV_NAME}"
 echo "  Punto de montaje : ${MOUNT_POINT}"
@@ -180,6 +216,5 @@ echo -e "${YELLOW}  Para verificar el RAID en cualquier momento:${NC}"
 echo "    cat /proc/mdstat"
 echo "    sudo mdadm --detail ${RAID_DEV}"
 echo ""
-echo -e "${YELLOW}  Nota: configuración en archivos temporales (/tmp).${NC}"
 echo -e "${YELLOW}  Para hacer el montaje persistente agregar a /etc/fstab:${NC}"
 echo "  /dev/${VG_NAME}/${LV_NAME}  ${MOUNT_POINT}  ext4  defaults  0  2"
