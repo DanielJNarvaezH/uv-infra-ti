@@ -47,6 +47,10 @@ PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 SCRIPTS_DIR="${PROJECT_ROOT}/scripts"
 DOCKER_DIR="${PROJECT_ROOT}/docker"
 
+# ── Discos (Sección 3) ─────────────────────────────────────────────────────────
+DISK0="/dev/sdb"
+DISK1="/dev/sdc"
+
 # ── Flags por defecto ──────────────────────────────────────────────────────────
 SKIP_PULL=false
 SKIP_RAID=false
@@ -159,7 +163,7 @@ if ! $SKIP_RAID; then
     RAID_SCRIPT="${SCRIPTS_DIR}/storage/setup_raid.sh"
     if [ -f "${RAID_SCRIPT}" ]; then
         info "Ejecutando ${RAID_SCRIPT}..."
-        bash "${RAID_SCRIPT}"
+        bash "${RAID_SCRIPT} ${DISK0} ${DISK1}"
         log "RAID 1 configurado."
     else
         err "No se encontró ${RAID_SCRIPT}"
