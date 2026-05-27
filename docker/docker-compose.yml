@@ -107,7 +107,7 @@ services:
         source: /mnt/uv_db
         target: /var/lib/postgresql/data
         bind:
-          selinux:
+          selinux: Z
       - type: bind
         source: ./db/init
         target: /docker-entrypoint-initdb.d
@@ -169,7 +169,7 @@ services:
         source: /mnt/uv_files
         target: /srv/uv_docs
         bind:
-          selinux: z
+          selinux: Z
     networks:
       vlan10:
         ipv4_address: 10.0.10.3
@@ -338,12 +338,12 @@ services:
         source: ./web/proxy/data
         target: /data
         bind:
-          selinux: z
+          selinux: Z
       - type: bind
         source: ./web/proxy/letsencrypt
         target: /etc/letsencrypt
         bind:
-          selinux: z
+          selinux: Z
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:81/ >/dev/null || exit 1"]
       interval: 30s
