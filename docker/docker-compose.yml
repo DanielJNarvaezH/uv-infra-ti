@@ -103,7 +103,7 @@ services:
       TZ: ${TZ}
       PGTZ: ${PGTZ}
     volumes:
-      - /mnt/uv_db:/var/lib/postgresql/data:Z
+      - /mnt/uv_db/pgdata:/var/lib/postgresql/data:Z
       - type: bind
         source: ./db/init
         target: /docker-entrypoint-initdb.d
