@@ -61,6 +61,29 @@ else
 fi
 
 # -----------------------------------------------------------------------------
+# Crear directorios de almacenamiento persistente si no existen
+# -----------------------------------------------------------------------------
+log "Verificando directorios de almacenamiento persistente..."
+
+PERSISTENT_DIRS=(
+    "/mnt/uv_db/pgdata"
+    "/mnt/uv_files"
+)
+
+for dir in "${PERSISTENT_DIRS[@]}"; do
+    if [ ! -d "$dir" ]; then
+        sudo mkdir -p "$dir"
+        log "  → Creado $dir"
+    else
+        log "  → $dir ya existe"
+    fi
+done
+
+# PostgreSQL exige que el data dir no sea world-readable
+sudo chmod 700 /mnt/uv_db/pgdata 2>/dev/null || true
+sudo chmod 755 /mnt/uv_files 2>/dev/null || true
+
+# -----------------------------------------------------------------------------
 # Argumento opcional --build
 # -----------------------------------------------------------------------------
 BUILD_FLAG=""
