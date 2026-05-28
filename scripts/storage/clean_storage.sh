@@ -11,6 +11,7 @@
 #   Deja el estado limpio para volver a ejecutar el despliegue completo.
 #
 #   Operaciones realizadas en orden inverso al de creación:
+#     0. Detener y eliminar contenedores que usan /mnt/uv_db, /mnt/uv_files, /mnt/uv_logs
 #     1. Desmontar /mnt/uv_db, /mnt/uv_files, /mnt/uv_logs
 #     2. Eliminar entradas de /etc/fstab gestionadas por setup_lvm.sh
 #     3. Eliminar LVs: lv_db, lv_files, lv_logs
@@ -102,10 +103,66 @@ warn "  Esta operación es destructiva e irreversible."
 warn "═════════════════════════════════════════════════════════"
 echo ""
 read -rp "¿Continuar con la limpieza? (sí/no): " confirm
-if [[ "$confirm" != "sí" && "$confirm" != "sí" && "$confirm" != "si" && "$confirm" != "SI" ]]; then
+if [[ "$confirm" != "sí" && "$confirm" != "si" && "$confirm" != "SI" ]]; then
     err "Operación cancelada por el usuario."
     exit 1
 fi
+
+# =============================================================================
+# PASO 0 — Detener contenedores que usan los puntos de montaje
+# =============================================================================
+section "0. Deteniendo contenedores que usan el almacenamiento"
+
+# Detectar runtime (podman preferido, docker como fallback)
+CONTAINER_CMD=""
+if command -v podman &>/dev/null; then
+    CONTAINER_CMD="podman"
+elif command -v docker &>/dev/null; then
+    CONTAINER_CMD="docker"
+fi
+
+if [[ -n "$CONTAINER_CMD" ]]; then
+    # Intentar detener todo el stack si hay un docker-compose.yml válido
+    SCRIPT_DIR_SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    PROJECT_ROOT_SELF="$(dirname "$SCRIPT_DIR_SELF")"
+    COMPOSE_DIR="${PROJECT_ROOT_SELF}/docker"
+
+    if [[ -f "${COMPOSE_DIR}/docker-compose.yml" ]] && command -v podman-compose &>/dev/null; then
+        info "Deteniendo stack con podman-compose..."
+        (cd "${COMPOSE_DIR}" && podman-compose down 2>/dev/null) && \
+            log "Stack detenido con podman-compose." || \
+            warn "podman-compose down falló o no había stack activo."
+    elif [[ -f "${COMPOSE_DIR}/docker-compose.yml" ]] && command -v docker-compose &>/dev/null; then
+        info "Deteniendo stack con docker-compose..."
+        (cd "${COMPOSE_DIR}" && docker-compose down 2>/dev/null) && \
+            log "Stack detenido con docker-compose." || \
+            warn "docker-compose down falló o no había stack activo."
+    fi
+
+    # Fallback: detener individualmente cualquier contenedor que use los mounts
+    mapfile -t ALL_CONTAINERS < <(${CONTAINER_CMD} ps -aq 2>/dev/null || true)
+    for cid in "${ALL_CONTAINERS[@]}"; do
+        [[ -z "$cid" ]] && continue
+        cname=$(${CONTAINER_CMD} inspect "$cid" --format '{{.Name}}' 2>/dev/null | sed 's|^/||' || echo "$cid")
+        binds=$(${CONTAINER_CMD} inspect "$cid" --format '{{range .HostConfig.Binds}}{{.}} {{end}}' 2>/dev/null || true)
+        for mp in "${MOUNT_POINTS[@]}"; do
+            if [[ "$binds" == *"${mp}"* ]]; then
+                if ${CONTAINER_CMD} inspect "$cid" --format '{{.State.Running}}' 2>/dev/null | grep -q "true"; then
+                    warn "Contenedor ${cname} usa ${mp} — deteniendo..."
+                    ${CONTAINER_CMD} stop -t 5 "$cid" &>/dev/null || ${CONTAINER_CMD} kill "$cid" &>/dev/null || true
+                fi
+                ${CONTAINER_CMD} rm "$cid" &>/dev/null || true
+                log "Contenedor ${cname} eliminado."
+                break
+            fi
+        done
+    done
+else
+    info "No se encontró podman ni docker — omitiendo detención de contenedores."
+fi
+
+# Pequeña pausa para que el kernel libere los mounts
+sleep 2
 
 # =============================================================================
 # PASO 1 — Desmontar volúmenes lógicos
