@@ -145,6 +145,12 @@ podman-compose up -d --no-deps ${BUILD_FLAG} \
     srv-web-03 \
     srv-dhcp-01
 
+# Conectar srv-dns-01 a vlan10 (no se puede con --ip en múltiples redes)
+if ! podman inspect srv-dns-01 --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' | grep -q "vlan10_servidores"; then
+    podman network connect --ip 10.0.10.9 vlan10_servidores srv-dns-01
+    log "srv-dns-01 conectado a vlan10_servidores (10.0.10.9)."
+fi
+
 wait_for_healthy "Tier 0" srv-dns-01 srv-ntp-01
 
 # -----------------------------------------------------------------------------
@@ -206,6 +212,12 @@ log "Tier 3 — Levantando Grafana y Proxy..."
 podman-compose up -d --no-deps ${BUILD_FLAG} \
     srv-grafana-01 \
     srv-proxy-01
+
+# Conectar srv-proxy-01 a vlan10 (no se puede con --ip en múltiples redes)
+if ! podman inspect srv-proxy-01 --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' | grep -q "vlan10_servidores"; then
+    podman network connect --ip 10.0.10.10 vlan10_servidores srv-proxy-01
+    log "srv-proxy-01 conectado a vlan10_servidores (10.0.10.10)."
+fi
 
 wait_for_healthy "Tier 3" srv-grafana-01 srv-proxy-01
 

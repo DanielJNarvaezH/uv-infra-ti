@@ -354,8 +354,7 @@ services:
     networks:
       vlan40:
         ipv4_address: 10.0.40.6
-      vlan10:
-        ipv4_address: 10.0.10.10
+    # vlan10 se conecta manualmente vía start.sh (podman no acepta --ip con múltiples redes)
     dns:
       - 10.0.40.3
       - 1.1.1.1
@@ -390,8 +389,7 @@ services:
     networks:
       vlan40:
         ipv4_address: 10.0.40.3
-      vlan10:
-        ipv4_address: 10.0.10.9
+    # vlan10 se conecta manualmente vía start.sh (podman no acepta --ip con múltiples redes)
     expose:
       - "53/tcp"
       - "53/udp"
