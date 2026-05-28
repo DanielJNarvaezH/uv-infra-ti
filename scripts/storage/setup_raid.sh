@@ -71,14 +71,22 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-# ── Validar argumentos ────────────────────────────────────────────────────────
-if [[ $# -lt 2 ]]; then
-    err "Se requieren al menos 2 discos para RAID 1."
-    err "Uso: sudo bash $0 /dev/sdb /dev/sdc [/dev/sdd ...]"
-    exit 1
+# ── Leer discos (argumentos o interactivamente) ───────────────────────────────
+if [[ $# -ge 2 ]]; then
+    DISKS=("$@")
+else
+    echo ""
+    echo -e "${YELLOW}════════════════════════════════════════════════════════════${NC}"
+    echo -e "${YELLOW}  Configuración RAID 1 — Se requieren los discos${NC}"
+    echo -e "${YELLOW}════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    read -rp "Disco 1 (ej. /dev/sdb) [por defecto: /dev/sdb]: " DISK0
+    DISK0="${DISK0:-/dev/sdb}"
+    read -rp "Disco 2 (ej. /dev/sdc) [por defecto: /dev/sdc]: " DISK1
+    DISK1="${DISK1:-/dev/sdc}"
+    DISKS=("$DISK0" "$DISK1")
+    echo ""
 fi
-
-DISKS=("$@")
 for disk in "${DISKS[@]}"; do
     if [[ ! -b "$disk" ]]; then
         err "$disk no es un dispositivo de bloque válido."
