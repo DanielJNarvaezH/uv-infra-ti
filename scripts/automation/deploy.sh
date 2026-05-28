@@ -6,15 +6,16 @@
 #
 # DESCRIPCIÓN:
 #   Automatiza todo el flujo de despliegue en orden secuencial:
-#     1. git pull          — Actualizar código desde el repositorio
-#     2. firewall.sh       — Reglas de firewall (UFW/iptables)
-#     3. setup_raid.sh     — RAID 1 con discos virtuales (requiere root)
-#     4. setup_lvm.sh      — LVM sobre RAID (requiere RAID previo)
-#     5. users.sh          — Usuarios, grupos y permisos especiales
-#     6. samba-setup.sh    — Preparación del host para Samba
-#     7. start.sh          — Levantar el stack de contenedores Podman
-#     8. Cron backup       — Programar backup automático diario a las 2:00 AM
-#     9. Cron monitor      — Programar monitoreo del sistema cada 15 minutos
+#     1. git pull           — Actualizar código desde el repositorio
+#     2. firewall.sh        — Reglas de firewall (UFW/iptables)
+#     3. clean_storage.sh   — Limpiar LVM/RAID previo (idempotente)
+#     4. setup_raid.sh      — RAID 1 con discos físicos (requiere root)
+#     5. setup_lvm.sh       — LVM sobre RAID (requiere RAID previo)
+#     6. users.sh           — Usuarios, grupos y permisos especiales
+#     7. samba-setup.sh     — Preparación del host para Samba
+#     8. start.sh           — Levantar el stack de contenedores Podman
+#     9. Cron backup        — Programar backup automático diario a las 2:00 AM
+#    10. Cron monitor       — Programar monitoreo del sistema cada 15 minutos
 #
 # USO:
 #   bash scripts/automation/deploy.sh                # despliegue completo
@@ -53,6 +54,7 @@ DISK1="/dev/sdc"
 
 # ── Flags por defecto ──────────────────────────────────────────────────────────
 SKIP_PULL=false
+SKIP_CLEAN=false
 SKIP_RAID=false
 SKIP_LVM=false
 SKIP_FIREWALL=false
@@ -67,6 +69,7 @@ BUILD_FLAG=""
 for arg in "$@"; do
     case "$arg" in
         --skip-pull)     SKIP_PULL=true ;;
+        --skip-clean)    SKIP_CLEAN=true ;;
         --skip-raid)     SKIP_RAID=true ;;
         --skip-lvm)      SKIP_LVM=true ;;
         --skip-firewall) SKIP_FIREWALL=true ;;
@@ -88,6 +91,7 @@ done
 if [[ -n "${ONLY_STEP:-}" ]]; then
     SKIP_PULL=true
     SKIP_FIREWALL=true
+    SKIP_CLEAN=true
     SKIP_RAID=true
     SKIP_LVM=true
     SKIP_USERS=true
@@ -98,6 +102,7 @@ if [[ -n "${ONLY_STEP:-}" ]]; then
     case "$ONLY_STEP" in
         pull)     SKIP_PULL=false ;;
         firewall) SKIP_FIREWALL=false ;;
+        clean)    SKIP_CLEAN=false ;;
         raid)     SKIP_RAID=false ;;
         lvm)      SKIP_LVM=false ;;
         users)    SKIP_USERS=false ;;
@@ -105,7 +110,7 @@ if [[ -n "${ONLY_STEP:-}" ]]; then
         stack)    SKIP_STACK=false ;;
         cron)     SKIP_CRON=false ;;
         monitor)  SKIP_MONITOR=false ;;
-        *) err "Paso desconocido: $ONLY_STEP. Válidos: pull, firewall, raid, lvm, users, samba, stack, cron, monitor" ;;
+        *) err "Paso desconocido: $ONLY_STEP. Válidos: pull, firewall, clean, raid, lvm, users, samba, stack, cron, monitor" ;;
     esac
 fi
 
@@ -126,7 +131,7 @@ fi
 # PASO 1 — Git Pull
 # =============================================================================
 if ! $SKIP_PULL; then
-    section "Paso 1/9 — Actualizando repositorio (git pull)"
+    section "Paso 1/10 — Actualizando repositorio (git pull)"
     cd "${PROJECT_ROOT}"
     info "Directorio: ${PROJECT_ROOT}"
     if git pull; then
@@ -142,7 +147,7 @@ fi
 # PASO 2 — Firewall
 # =============================================================================
 if ! $SKIP_FIREWALL; then
-    section "Paso 2/9 — Configurando firewall"
+    section "Paso 2/10 — Configurando firewall"
     FIREWALL_SCRIPT="${SCRIPTS_DIR}/security/firewall.sh"
     if [ -f "${FIREWALL_SCRIPT}" ]; then
         info "Ejecutando ${FIREWALL_SCRIPT}..."
@@ -156,10 +161,27 @@ else
 fi
 
 # =============================================================================
-# PASO 3 — RAID 1
+# PASO 3 — Limpieza de almacenamiento (LVM + RAID)
+# =============================================================================
+if ! $SKIP_CLEAN; then
+    section "Paso 3/10 — Limpiando estado de almacenamiento previo"
+    CLEAN_SCRIPT="${SCRIPTS_DIR}/storage/clean_storage.sh"
+    if [ -f "${CLEAN_SCRIPT}" ]; then
+        info "Ejecutando ${CLEAN_SCRIPT} ${DISK0} ${DISK1}..."
+        bash "${CLEAN_SCRIPT}" "${DISK0}" "${DISK1}"
+        log "Almacenamiento limpiado."
+    else
+        err "No se encontró ${CLEAN_SCRIPT}"
+    fi
+else
+    info "Omitiendo: limpieza de almacenamiento (--skip-clean)"
+fi
+
+# =============================================================================
+# PASO 4 — RAID 1
 # =============================================================================
 if ! $SKIP_RAID; then
-    section "Paso 3/9 — Configurando RAID 1"
+    section "Paso 4/10 — Configurando RAID 1"
     RAID_SCRIPT="${SCRIPTS_DIR}/storage/setup_raid.sh"
     if [ -f "${RAID_SCRIPT}" ]; then
         info "Ejecutando ${RAID_SCRIPT}..."
@@ -173,10 +195,10 @@ else
 fi
 
 # =============================================================================
-# PASO 4 — LVM sobre RAID
+# PASO 5 — LVM sobre RAID
 # =============================================================================
 if ! $SKIP_LVM; then
-    section "Paso 4/9 — Configurando LVM sobre RAID"
+    section "Paso 5/10 — Configurando LVM sobre RAID"
     LVM_SCRIPT="${SCRIPTS_DIR}/storage/setup_lvm.sh"
     if [ -f "${LVM_SCRIPT}" ]; then
         info "Ejecutando ${LVM_SCRIPT}..."
@@ -190,10 +212,10 @@ else
 fi
 
 # =============================================================================
-# PASO 5 — Usuarios y grupos
+# PASO 6 — Usuarios y grupos
 # =============================================================================
 if ! $SKIP_USERS; then
-    section "Paso 5/9 — Creando usuarios y grupos"
+    section "Paso 6/10 — Creando usuarios y grupos"
     USERS_SCRIPT="${SCRIPTS_DIR}/users.sh"
     if [ -f "${USERS_SCRIPT}" ]; then
         info "Ejecutando ${USERS_SCRIPT}..."
@@ -227,10 +249,10 @@ else
 fi
 
 # =============================================================================
-# PASO 6 — Samba
+# PASO 7 — Samba
 # =============================================================================
 if ! $SKIP_SAMBA; then
-    section "Paso 6/9 — Preparando host para Samba"
+    section "Paso 7/10 — Preparando host para Samba"
     SAMBA_SCRIPT="${SCRIPTS_DIR}/samba-setup.sh"
     if [ -f "${SAMBA_SCRIPT}" ]; then
         info "Ejecutando ${SAMBA_SCRIPT}..."
@@ -244,10 +266,10 @@ else
 fi
 
 # =============================================================================
-# PASO 7 — Levantar stack de contenedores
+# PASO 8 — Levantar stack de contenedores
 # =============================================================================
 if ! $SKIP_STACK; then
-    section "Paso 7/9 — Levantando stack de contenedores"
+    section "Paso 8/10 — Levantando stack de contenedores"
     START_SCRIPT="${SCRIPTS_DIR}/start.sh"
     if [ -f "${START_SCRIPT}" ]; then
         info "Ejecutando ${START_SCRIPT} ${BUILD_FLAG}..."
@@ -261,10 +283,10 @@ else
 fi
 
 # =============================================================================
-# PASO 8 — Cron job de backup automático
+# PASO 9 — Cron job de backup automático
 # =============================================================================
 if ! $SKIP_CRON; then
-    section "Paso 8/9 — Configurando cron job de backup"
+    section "Paso 9/10 — Configurando cron job de backup"
     BACKUP_SCRIPT="${SCRIPTS_DIR}/automation/backup.sh"
     if [ -f "${BACKUP_SCRIPT}" ]; then
         if ! crontab -l 2>/dev/null | grep -q "backup.sh"; then
@@ -281,10 +303,10 @@ else
 fi
 
 # =============================================================================
-# PASO 9 — Cron job de monitoreo (cada 15 minutos)
+# PASO 10 — Cron job de monitoreo (cada 15 minutos)
 # =============================================================================
 if ! $SKIP_MONITOR; then
-    section "Paso 9/9 — Configurando cron job de monitoreo"
+    section "Paso 10/10 — Configurando cron job de monitoreo"
     MONITOR_SCRIPT="${SCRIPTS_DIR}/automation/monitor.sh"
     if [ -f "${MONITOR_SCRIPT}" ]; then
         chmod +x "${MONITOR_SCRIPT}"
@@ -316,6 +338,7 @@ echo ""
 echo "  Pasos ejecutados:"
 ! $SKIP_PULL     && echo "    ✓ git pull"           || echo "    ✗ git pull (omitido)"
 ! $SKIP_FIREWALL && echo "    ✓ firewall"           || echo "    ✗ firewall (omitido)"
+! $SKIP_CLEAN    && echo "    ✓ limpieza almacenamiento" || echo "    ✗ limpieza almacenamiento (omitido)"
 ! $SKIP_RAID     && echo "    ✓ RAID 1"             || echo "    ✗ RAID 1 (omitido)"
 ! $SKIP_LVM      && echo "    ✓ LVM"                || echo "    ✗ LVM (omitido)"
 ! $SKIP_USERS    && echo "    ✓ usuarios/grupos"    || echo "    ✗ usuarios/grupos (omitido)"
