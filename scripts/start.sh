@@ -93,50 +93,65 @@ if [[ "${1:-}" == "--build" ]]; then
 fi
 
 # -----------------------------------------------------------------------------
+# 0. Idempotencia: limpiar contenedores previos
+# -----------------------------------------------------------------------------
+log "Asegurando estado limpio..."
+cd "${DOCKER_DIR}"
+podman-compose down --remove-orphans 2>/dev/null || true
+log "Estado limpio confirmado."
+
+# -----------------------------------------------------------------------------
+# Helper: esperar a que una lista de servicios esté healthy
+# -----------------------------------------------------------------------------
+wait_for_healthy() {
+    local label="$1"
+    shift
+    local svcs=("$@")
+    local timeout=120
+    local elapsed=0
+
+    log "[$label] Esperando healthcheck de: ${svcs[*]}"
+
+    while [ $elapsed -lt $timeout ]; do
+        local all_ok=true
+        for s in "${svcs[@]}"; do
+            local st
+            st=$(podman inspect "$s" --format '{{.State.Health.Status}}' 2>/dev/null || echo "missing")
+            if [[ "$st" != "healthy" ]]; then
+                all_ok=false
+                break
+            fi
+        done
+        if $all_ok; then
+            log "[$label] Healthy"
+            return 0
+        fi
+        sleep 5
+        elapsed=$((elapsed + 5))
+    done
+
+    err "[$label] Timeout esperando healthcheck de: ${svcs[*]}"
+}
+
+# -----------------------------------------------------------------------------
 # 1. Levantar servicios base (sin DHCP primero para evitar timing issues)
 # -----------------------------------------------------------------------------
 log "Levantando servicios base..."
 cd "${DOCKER_DIR}"
-podman-compose up -d ${BUILD_FLAG} \
+podman-compose up -d --no-deps ${BUILD_FLAG} \
+    srv-dns-01 \
     srv-ntp-01 \
-    srv-db-01 \
-    srv-files-01 \
     srv-smtp-01 \
-    srv-php-fpm \
-    srv-dns-01
-
-# -----------------------------------------------------------------------------
-# 2. Levantar pila de monitoreo (antes que el proxy porque depende de Grafana)
-# -----------------------------------------------------------------------------
-log "Levantando pila de monitoreo..."
-podman-compose up -d ${BUILD_FLAG} \
-    srv-cadvisor-01 \
-    srv-prometheus-01 \
-    srv-grafana-01
-
-# -----------------------------------------------------------------------------
-# 3. Levantar servidores web y proxy (dependen de la pila de monitoreo)
-# -----------------------------------------------------------------------------
-log "Levantando servidores web y proxy..."
-podman-compose up -d ${BUILD_FLAG} \
-    srv-web-01 \
-    srv-web-02 \
     srv-web-03 \
-    srv-proxy-01
+    srv-dhcp-01
+
+wait_for_healthy "Tier 0" srv-dns-01 srv-ntp-01
 
 # -----------------------------------------------------------------------------
-# 4. Levantar srv-dhcp-01 en VLAN 10
-# -----------------------------------------------------------------------------
-log "Levantando srv-dhcp-01..."
-podman-compose up -d ${BUILD_FLAG} srv-dhcp-01
-
-# -----------------------------------------------------------------------------
-# 5. Conectar srv-dhcp-01 a VLAN 20 y VLAN 30
-#    (necesario porque podman-compose no soporta --ip con múltiples redes)
+# 2. Conectar srv-dhcp-01 a VLAN 20 y VLAN 30
 # -----------------------------------------------------------------------------
 log "Conectando srv-dhcp-01 a vlan20 y vlan30..."
 
-# Crear redes si no existen (podman-compose no las crea si no están en uso)
 if ! podman network inspect vlan20_administracion --format '{{.Name}}' >/dev/null 2>&1; then
     log "Creando red vlan20_administracion..."
     podman network create --driver bridge --subnet 10.0.20.0/24 --gateway 10.0.20.1 vlan20_administracion
@@ -147,7 +162,6 @@ if ! podman network inspect vlan30_usuarios --format '{{.Name}}' >/dev/null 2>&1
     podman network create --driver bridge --subnet 10.0.30.0/24 --gateway 10.0.30.1 vlan30_usuarios
 fi
 
-# Conectar solo si no está ya conectado
 if ! podman inspect srv-dhcp-01 --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' | grep -q "vlan20_administracion"; then
     podman network connect vlan20_administracion srv-dhcp-01
     log "Conectado a vlan20_administracion."
@@ -163,29 +177,44 @@ else
 fi
 
 # -----------------------------------------------------------------------------
-# 6. Esperar a que los servicios estén healthy (máx. 120s)
+# 3. Tier 1 — DB, Files, PHP-FPM, cAdvisor
 # -----------------------------------------------------------------------------
-log "Esperando que los servicios estén healthy (máx. 120s)..."
+log "Tier 1 — Levantando DB, Files, PHP-FPM, cAdvisor..."
+podman-compose up -d --no-deps ${BUILD_FLAG} \
+    srv-db-01 \
+    srv-files-01 \
+    srv-php-fpm \
+    srv-cadvisor-01
 
-SERVICES=("srv-ntp-01" "srv-db-01" "srv-files-01" "srv-smtp-01" "srv-dhcp-01" "srv-php-fpm" "srv-cadvisor-01" "srv-prometheus-01" "srv-grafana-01" "srv-web-01" "srv-web-02" "srv-web-03" "srv-proxy-01" "srv-dns-01")
-TIMEOUT=120
-ELAPSED=0
+wait_for_healthy "Tier 1" srv-db-01 srv-files-01 srv-php-fpm srv-cadvisor-01
 
-while [ $ELAPSED -lt $TIMEOUT ]; do
-    ALL_HEALTHY=true
-    for svc in "${SERVICES[@]}"; do
-        STATUS=$(podman inspect "${svc}" --format '{{.State.Health.Status}}' 2>/dev/null || echo "missing")
-        if [[ "$STATUS" != "healthy" ]]; then
-            ALL_HEALTHY=false
-            break
-        fi
-    done
-    if $ALL_HEALTHY; then
-        break
-    fi
-    sleep 5
-    ELAPSED=$((ELAPSED + 5))
-done
+# -----------------------------------------------------------------------------
+# 4. Tier 2 — Prometheus, Web-01, Web-02
+# -----------------------------------------------------------------------------
+log "Tier 2 — Levantando Prometheus y servidores web..."
+podman-compose up -d --no-deps ${BUILD_FLAG} \
+    srv-prometheus-01 \
+    srv-web-01 \
+    srv-web-02
+
+wait_for_healthy "Tier 2" srv-prometheus-01 srv-web-01 srv-web-02
+
+# -----------------------------------------------------------------------------
+# 5. Tier 3 — Grafana, Proxy
+# -----------------------------------------------------------------------------
+log "Tier 3 — Levantando Grafana y Proxy..."
+podman-compose up -d --no-deps ${BUILD_FLAG} \
+    srv-grafana-01 \
+    srv-proxy-01
+
+wait_for_healthy "Tier 3" srv-grafana-01 srv-proxy-01
+
+# -----------------------------------------------------------------------------
+# 6. Verificación final de todo el stack
+# -----------------------------------------------------------------------------
+log "Verificación final de todo el stack..."
+ALL_SERVICES=("srv-ntp-01" "srv-db-01" "srv-files-01" "srv-smtp-01" "srv-dhcp-01" "srv-php-fpm" "srv-cadvisor-01" "srv-prometheus-01" "srv-grafana-01" "srv-web-01" "srv-web-02" "srv-web-03" "srv-proxy-01" "srv-dns-01")
+wait_for_healthy "Final" "${ALL_SERVICES[@]}"
 
 # -----------------------------------------------------------------------------
 # 7. Estado final
@@ -196,29 +225,23 @@ podman ps --filter "label=io.podman.compose.project=docker" \
     --format "table {{.Names}}\t{{.Status}}"
 echo ""
 
-if $ALL_HEALTHY; then
-    log "✅ Todos los servicios están healthy."
-    log ""
-    log "Acceso SSH:"
-    log "  srv-db-01    → ssh -p 2222 uv_dbadmin@localhost"
-    log "  srv-files-01 → ssh -p 2223 uv_admin@localhost"
-    log ""
-    log "NPM Admin UI  → http://proxy.unidadvictimas.corp:8081"
-    log "MailHog UI    → http://localhost:8025 (solo desde VLAN 20)"
-    log ""
-    log "Dominios locales:"
-    log "  http://unidadvictimas.corp      → Portal Ciudadano"
-    log "  http://rni.unidadvictimas.corp  → RNI"
-    log "  http://intranet.unidadvictimas.corp  → Intranet SUMA"
-    log "  http://proxy.unidadvictimas.corp     → NPM Admin Panel"
-    log ""
-    log "Nota: en entornos rootless (Podman sin root) los puertos 80/443"
-    log "      requieren sysctl. Para usar puertos estándar ejecuta:"
-    log "      sudo sysctl net.ipv4.ip_unprivileged_port_start=80"
-    log ""
-    log "Acceso directo srv-web-01 → http://localhost:8082"
-else
-    warn "Algunos servicios aún no están healthy. Verifica con:"
-    warn "  podman ps -a"
-    warn "  podman logs <contenedor>"
-fi
+log "Todos los servicios están healthy."
+log ""
+log "Acceso SSH:"
+log "  srv-db-01    → ssh -p 2222 uv_dbadmin@localhost"
+log "  srv-files-01 → ssh -p 2223 uv_admin@localhost"
+log ""
+log "NPM Admin UI  → http://proxy.unidadvictimas.corp:8081"
+log "MailHog UI    → http://localhost:8025 (solo desde VLAN 20)"
+log ""
+log "Dominios locales:"
+log "  http://unidadvictimas.corp      → Portal Ciudadano"
+log "  http://rni.unidadvictimas.corp  → RNI"
+log "  http://intranet.unidadvictimas.corp  → Intranet SUMA"
+log "  http://proxy.unidadvictimas.corp     → NPM Admin Panel"
+log ""
+log "Nota: en entornos rootless (Podman sin root) los puertos 80/443"
+log "      requieren sysctl. Para usar puertos estándar ejecuta:"
+log "      sudo sysctl net.ipv4.ip_unprivileged_port_start=80"
+log ""
+log "Acceso directo srv-web-01 → http://localhost:8082"
