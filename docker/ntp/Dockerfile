@@ -27,4 +27,5 @@ EXPOSE 123/udp
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD chronyc tracking | grep -i "reference id" || exit 1
 
-CMD ["chronyd", "-d", "-x", "-f", "/etc/chrony/chrony.conf"]
+# Eliminar PID file persistente de ejecuciones anteriores antes de iniciar
+CMD ["sh", "-c", "rm -f /run/chrony/chronyd.pid && exec chronyd -d -x -f /etc/chrony/chrony.conf"]
