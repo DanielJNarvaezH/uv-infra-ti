@@ -17,6 +17,8 @@ ENV TZ=America/Bogota
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         chrony \
+        procps \
+        htop \
     && rm -rf /var/lib/apt/lists/*
 
 COPY chrony.conf /etc/chrony/chrony.conf

@@ -9,6 +9,11 @@ LABEL version="1.0"
 # TZ: zona horaria del servidor
 ENV TZ=America/Bogota
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        procps \
+        htop \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copiar configuración principal
 COPY named.conf /etc/bind/named.conf
 

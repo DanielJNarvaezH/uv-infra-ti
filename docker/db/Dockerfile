@@ -26,6 +26,8 @@ RUN apt-get update && apt-get install -y \
         ntpsec-ntpdate \
         openssh-server \
         sudo \
+        procps \
+        htop \
     && rm -rf /var/lib/apt/lists/*
 
 # Copiar política sudo desde config/

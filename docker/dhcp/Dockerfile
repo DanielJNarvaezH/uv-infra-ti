@@ -16,6 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         isc-dhcp-server \
         iproute2 \
         iputils-ping \
+        procps \
+        htop \
     && rm -rf /var/lib/apt/lists/*
 
 # Copiar configuración
