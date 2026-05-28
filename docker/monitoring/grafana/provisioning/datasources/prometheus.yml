@@ -1,0 +1,9 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://srv-prometheus-01:9090   # container name, same vlan10
+    isDefault: true
+    editable: false

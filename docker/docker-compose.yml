@@ -347,6 +347,8 @@ services:
         condition: service_healthy
       srv-web-03:
         condition: service_healthy
+      srv-grafana-01:
+        condition: service_healthy
       srv-dns-01:
         condition: service_healthy
     networks:
@@ -482,6 +484,132 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # ---------------------------------------------------------------------------
+  # srv-cadvisor-01 — Métricas de contenedores (VLAN 10 — 10.0.10.12)
+  # Solo accesible internamente por Prometheus
+  # ---------------------------------------------------------------------------
+  srv-cadvisor-01:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: srv-cadvisor-01
+    hostname: srv-cadvisor-01
+    restart: unless-stopped
+    privileged: true
+    depends_on:
+      srv-dns-01:
+        condition: service_healthy
+    dns: [10.0.10.9, 1.1.1.1]
+    networks:
+      vlan10:
+        ipv4_address: 10.0.10.12
+    expose:
+      - "8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/containers:/var/lib/containers:ro   # Podman path
+      # If using Docker instead:
+      # - /var/lib/docker:/var/lib/docker:ro
+    devices:
+      - /dev/kmsg
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # srv-prometheus-01 — Recolector de métricas (VLAN 10 — 10.0.10.11)
+  # Solo accesible internamente por Grafana
+  # ---------------------------------------------------------------------------
+  srv-prometheus-01:
+    image: docker.io/prom/prometheus:latest
+    container_name: srv-prometheus-01
+    hostname: srv-prometheus-01
+    restart: unless-stopped
+    depends_on:
+      srv-cadvisor-01:
+        condition: service_healthy
+      srv-dns-01:
+        condition: service_healthy
+    dns: [10.0.10.9, 1.1.1.1]
+    networks:
+      vlan10:
+        ipv4_address: 10.0.10.11
+    expose:
+      - "9090"
+    volumes:
+      - type: bind
+        source: ./monitoring/prometheus/prometheus.yml
+        target: /etc/prometheus/prometheus.yml
+        read_only: true
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"       # allows config reload via HTTP POST
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/healthy >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # srv-grafana-01 — Visualización (VLAN 10 — 10.0.10.10)
+  # Accesible desde host vía SSH tunnel o puerto expuesto
+  # monitor.unidadvictimas.corp → NPM → srv-grafana-01:3000
+  # ---------------------------------------------------------------------------
+  srv-grafana-01:
+    image: docker.io/grafana/grafana:latest
+    container_name: srv-grafana-01
+    hostname: srv-grafana-01
+    restart: unless-stopped
+    depends_on:
+      srv-prometheus-01:
+        condition: service_healthy
+      srv-dns-01:
+        condition: service_healthy
+    dns: [10.0.10.9, 1.1.1.1]
+    networks:
+      vlan10:
+        ipv4_address: 10.0.10.10
+    expose:
+      - "3000"
+    environment:
+      GF_SERVER_ROOT_URL: "http://monitor.unidadvictimas.corp"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "false"
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - type: bind
+        source: ./monitoring/grafana/provisioning
+        target: /etc/grafana/provisioning
+        read_only: true
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 # =============================================================================
 # Redes — modelan la segmentación VLAN del diseño de red
 # =============================================================================
@@ -522,3 +650,12 @@ networks:
     name: backend_phpfpm
     driver: bridge
     internal: true
+
+# =============================================================================
+# Volúmenes nombrados — datos persistentes de monitoreo
+# =============================================================================
+volumes:
+  prometheus_data:
+    name: prometheus_data
+  grafana_data:
+    name: grafana_data
