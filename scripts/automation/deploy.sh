@@ -290,7 +290,7 @@ if ! $SKIP_CRON; then
     BACKUP_SCRIPT="${SCRIPTS_DIR}/automation/backup.sh"
     if [ -f "${BACKUP_SCRIPT}" ]; then
         if ! crontab -l 2>/dev/null | grep -q "backup.sh"; then
-            (crontab -l 2>/dev/null; echo "0 2 * * * ${BACKUP_SCRIPT} >> /var/log/uv_backup.log 2>&1") | crontab -
+            (crontab -l 2>/dev/null || true; echo "0 2 * * * ${BACKUP_SCRIPT} >> /var/log/uv_backup.log 2>&1") | crontab -
             log "Cron job de backup configurado — diario a las 02:00."
         else
             warn "Cron job de backup ya existe — omitiendo."
@@ -311,7 +311,7 @@ if ! $SKIP_MONITOR; then
     if [ -f "${MONITOR_SCRIPT}" ]; then
         chmod +x "${MONITOR_SCRIPT}"
         if ! crontab -l 2>/dev/null | grep -q "monitor.sh"; then
-            (crontab -l 2>/dev/null; echo "*/15 * * * * ${MONITOR_SCRIPT} --quiet >> /dev/null 2>&1") | crontab -
+            (crontab -l 2>/dev/null || true; echo "*/15 * * * * ${MONITOR_SCRIPT} --quiet >> /dev/null 2>&1") | crontab -
             log "Cron job de monitoreo configurado — cada 15 minutos."
         else
             warn "Cron job de monitoreo ya existe — omitiendo."
