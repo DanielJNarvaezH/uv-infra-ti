@@ -566,7 +566,7 @@ services:
         max-file: "3"
 
   # ---------------------------------------------------------------------------
-  # srv-grafana-01 — Visualización (VLAN 10 — 10.0.10.10)
+  # srv-grafana-01 — Visualización (VLAN 10 — 10.0.10.13)
   # Accesible desde host vía SSH tunnel o puerto expuesto
   # monitor.unidadvictimas.corp → NPM → srv-grafana-01:3000
   # ---------------------------------------------------------------------------
@@ -583,7 +583,7 @@ services:
     dns: [10.0.10.9, 1.1.1.1]
     networks:
       vlan10:
-        ipv4_address: 10.0.10.10
+        ipv4_address: 10.0.10.13
     expose:
       - "3000"
     environment:

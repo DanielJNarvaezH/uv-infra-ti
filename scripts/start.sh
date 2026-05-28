@@ -83,7 +83,16 @@ podman-compose up -d ${BUILD_FLAG} \
     srv-dns-01
 
 # -----------------------------------------------------------------------------
-# 2. Levantar servidores web y proxy
+# 2. Levantar pila de monitoreo (antes que el proxy porque depende de Grafana)
+# -----------------------------------------------------------------------------
+log "Levantando pila de monitoreo..."
+podman-compose up -d ${BUILD_FLAG} \
+    srv-cadvisor-01 \
+    srv-prometheus-01 \
+    srv-grafana-01
+
+# -----------------------------------------------------------------------------
+# 3. Levantar servidores web y proxy (dependen de la pila de monitoreo)
 # -----------------------------------------------------------------------------
 log "Levantando servidores web y proxy..."
 podman-compose up -d ${BUILD_FLAG} \
@@ -93,13 +102,13 @@ podman-compose up -d ${BUILD_FLAG} \
     srv-proxy-01
 
 # -----------------------------------------------------------------------------
-# 3. Levantar srv-dhcp-01 en VLAN 10
+# 4. Levantar srv-dhcp-01 en VLAN 10
 # -----------------------------------------------------------------------------
 log "Levantando srv-dhcp-01..."
 podman-compose up -d ${BUILD_FLAG} srv-dhcp-01
 
 # -----------------------------------------------------------------------------
-# 4. Conectar srv-dhcp-01 a VLAN 20 y VLAN 30
+# 5. Conectar srv-dhcp-01 a VLAN 20 y VLAN 30
 #    (necesario porque podman-compose no soporta --ip con múltiples redes)
 # -----------------------------------------------------------------------------
 log "Conectando srv-dhcp-01 a vlan20 y vlan30..."
@@ -131,11 +140,11 @@ else
 fi
 
 # -----------------------------------------------------------------------------
-# 5. Esperar a que los servicios estén healthy (máx. 120s)
+# 6. Esperar a que los servicios estén healthy (máx. 120s)
 # -----------------------------------------------------------------------------
 log "Esperando que los servicios estén healthy (máx. 120s)..."
 
-SERVICES=("srv-ntp-01" "srv-db-01" "srv-files-01" "srv-smtp-01" "srv-dhcp-01" "srv-php-fpm" "srv-web-01" "srv-web-02" "srv-web-03" "srv-proxy-01" "srv-dns-01")
+SERVICES=("srv-ntp-01" "srv-db-01" "srv-files-01" "srv-smtp-01" "srv-dhcp-01" "srv-php-fpm" "srv-cadvisor-01" "srv-prometheus-01" "srv-grafana-01" "srv-web-01" "srv-web-02" "srv-web-03" "srv-proxy-01" "srv-dns-01")
 TIMEOUT=120
 ELAPSED=0
 
@@ -156,7 +165,7 @@ while [ $ELAPSED -lt $TIMEOUT ]; do
 done
 
 # -----------------------------------------------------------------------------
-# 6. Estado final
+# 7. Estado final
 # -----------------------------------------------------------------------------
 echo ""
 log "=== Estado del stack ==="
