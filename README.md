@@ -26,7 +26,7 @@ uv-infra-ti/
 │   ├── .env.example              # Variables de entorno (copiar a .env)
 │   ├── db/                       # PostgreSQL 16 + SSH
 │   ├── dhcp/                     # ISC DHCP Server
-│   ├── dns/                      # BIND9 con zonas uv.local
+│   ├── dns/                      # BIND9 con zonas uv.interno
 │   ├── files/                    # Samba + SSH
 │   ├── ntp/                      # chrony
 │   ├── smtp/                     # MailHog

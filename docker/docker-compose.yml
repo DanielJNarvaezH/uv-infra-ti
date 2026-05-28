@@ -48,6 +48,12 @@ services:
     container_name: srv-php-fpm
     hostname: srv-php-fpm
     restart: unless-stopped
+    depends_on:
+      srv-dns-01:
+        condition: service_healthy
+    dns:
+      - 10.0.10.9
+      - 1.1.1.1
     networks:
       backend:
     expose:
@@ -91,6 +97,11 @@ services:
     depends_on:
       srv-ntp-01:
         condition: service_healthy
+      srv-dns-01:
+        condition: service_healthy
+    dns:
+      - 10.0.10.9
+      - 1.1.1.1
     container_name: srv-db-01
     hostname: srv-db-01
     restart: unless-stopped
@@ -150,6 +161,11 @@ services:
     depends_on:
       srv-ntp-01:
         condition: service_healthy
+      srv-dns-01:
+        condition: service_healthy
+    dns:
+      - 10.0.10.9
+      - 1.1.1.1
     container_name: srv-files-01
     hostname: srv-files-01
     restart: unless-stopped
@@ -199,6 +215,11 @@ services:
         condition: service_healthy
       srv-php-fpm:
         condition: service_healthy
+      srv-dns-01:
+        condition: service_healthy
+    dns:
+      - 10.0.40.3
+      - 1.1.1.1
     networks:
       vlan40:
       backend:
@@ -243,6 +264,11 @@ services:
         condition: service_healthy
       srv-php-fpm:
         condition: service_healthy
+      srv-dns-01:
+        condition: service_healthy
+    dns:
+      - 10.0.40.3
+      - 1.1.1.1
     networks:
       vlan40:
       backend:
@@ -277,6 +303,9 @@ services:
     container_name: srv-web-03
     hostname: srv-web-03
     restart: unless-stopped
+    dns:
+      - 10.0.10.9
+      - 1.1.1.1
     networks:
       vlan10:
         ipv4_address: 10.0.10.5
@@ -318,12 +347,19 @@ services:
         condition: service_healthy
       srv-web-03:
         condition: service_healthy
+      srv-dns-01:
+        condition: service_healthy
     networks:
       vlan40:
         ipv4_address: 10.0.40.6
+      vlan10:
+        ipv4_address: 10.0.10.10
+    dns:
+      - 10.0.40.3
+      - 1.1.1.1
     ports:
-      - "8080:80"
-      - "8443:443"
+      - "80:80"
+      - "443:443"
       - "8081:81"
     volumes:
       - ./web/proxy/data:/data:Z
@@ -352,11 +388,13 @@ services:
     networks:
       vlan40:
         ipv4_address: 10.0.40.3
+      vlan10:
+        ipv4_address: 10.0.10.9
     expose:
       - "53/tcp"
       - "53/udp"
     healthcheck:
-      test: ["CMD-SHELL", "pgrep named >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "named-checkconf && pgrep named >/dev/null || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -378,6 +416,9 @@ services:
     container_name: srv-smtp-01
     hostname: srv-smtp-01
     restart: unless-stopped
+    dns:
+      - 10.0.40.3
+      - 1.1.1.1
     environment:
       MH_SMTP_BIND_ADDR: "0.0.0.0:1025"
       MH_API_BIND_ADDR: "0.0.0.0:8025"
@@ -420,6 +461,9 @@ services:
     cap_add:
       - NET_ADMIN
       - NET_RAW
+    dns:
+      - 10.0.10.9
+      - 1.1.1.1
     networks:
       vlan10:
         ipv4_address: 10.0.10.6

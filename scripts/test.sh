@@ -98,15 +98,15 @@ test_dns() {
     fi
     log "Proceso named corriendo"
 
-    # Zona uv.local
+    # Zona uv.interno
     local tests_uvlocal=(
-        "srv-web-01.uv.local:10.0.40.2"
-        "srv-web-02.uv.local:10.0.40.5"
-        "srv-web-03.uv.local:10.0.10.5"
-        "srv-db-01.uv.local:10.0.10.2"
-        "srv-files-01.uv.local:10.0.10.3"
-        "srv-dns-01.uv.local:10.0.40.3"
-        "srv-proxy-01.uv.local:10.0.40.6"
+        "srv-web-01.uv.interno:10.0.40.2"
+        "srv-web-02.uv.interno:10.0.40.5"
+        "srv-web-03.uv.interno:10.0.10.5"
+        "srv-db-01.uv.interno:10.0.10.2"
+        "srv-files-01.uv.interno:10.0.10.3"
+        "srv-dns-01.uv.interno:10.0.40.3"
+        "srv-proxy-01.uv.interno:10.0.40.6"
     )
     for t in "${tests_uvlocal[@]}"; do
         local host="${t%%:*}"
@@ -120,12 +120,12 @@ test_dns() {
         fi
     done
 
-    # Zona unidadvictimas.co (nueva configuración)
+    # Zona unidadvictimas.corp (nueva configuración)
     local tests_public=(
-        "unidadvictimas.co:10.0.40.2"
-        "proxy.unidadvictimas.co:10.0.40.6"
-        "rni.unidadvictimas.co:10.0.40.5"
-        "internal.unidadvictimas.co:10.0.10.5"
+        "unidadvictimas.corp:10.0.40.2"
+        "proxy.unidadvictimas.corp:10.0.40.6"
+        "rni.unidadvictimas.corp:10.0.40.5"
+        "internal.unidadvictimas.corp:10.0.10.5"
     )
     for t in "${tests_public[@]}"; do
         local host="${t%%:*}"

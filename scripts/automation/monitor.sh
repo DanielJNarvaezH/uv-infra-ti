@@ -67,7 +67,7 @@ PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}
 CPU_THRESHOLD="${CPU_THRESHOLD:-85}"
 MEM_THRESHOLD="${MEM_THRESHOLD:-85}"
 DISK_THRESHOLD="${DISK_THRESHOLD:-85}"
-ALERT_EMAIL="${ALERT_EMAIL:-uv_admin@uv.local}"
+ALERT_EMAIL="${ALERT_EMAIL:-uv_admin@uv.interno}"
 
 LOG_FILE="/var/log/uv_monitor.log"
 SMTP_HOST="localhost"
@@ -658,7 +658,7 @@ Script: scripts/automation/monitor.sh
     if command -v curl &>/dev/null; then
         SMTP_PAYLOAD=$(cat <<EOF
 {
-  "From": {"Email": "monitor@uv.local", "Name": "Monitor UV-SIG"},
+  "From": {"Email": "monitor@uv.interno", "Name": "Monitor UV-SIG"},
   "To": [{"Email": "${ALERT_EMAIL}"}],
   "Subject": "${ALERT_SUBJECT}",
   "TextPart": "$(echo "${ALERT_BODY}" | sed 's/"/\\"/g' | tr '\n' ' ')"
@@ -669,9 +669,9 @@ EOF
         # MailHog acepta SMTP directo — intentar con curl SMTP
         curl -s --max-time 5 \
             --url "smtp://${SMTP_HOST}:${SMTP_PORT}" \
-            --mail-from "monitor@uv.local" \
+            --mail-from "monitor@uv.interno" \
             --mail-rcpt "${ALERT_EMAIL}" \
-            -T <(echo -e "From: Monitor UV-SIG <monitor@uv.local>\nTo: ${ALERT_EMAIL}\nSubject: ${ALERT_SUBJECT}\n\n${ALERT_BODY}") \
+            -T <(echo -e "From: Monitor UV-SIG <monitor@uv.interno>\nTo: ${ALERT_EMAIL}\nSubject: ${ALERT_SUBJECT}\n\n${ALERT_BODY}") \
             2>/dev/null && log_ok "Alerta enviada por SMTP a ${ALERT_EMAIL}" \
                         || log_warn "No se pudo enviar alerta SMTP (MailHog no accesible)"
     else

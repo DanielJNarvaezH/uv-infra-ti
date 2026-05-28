@@ -1,0 +1,19 @@
+$TTL 3600
+@   IN  SOA  srv-dns-01.unidadvictimas.corp. admin.unidadvictimas.corp. (
+              2026052701  ; Serial
+              3600        ; Refresh
+              900         ; Retry
+              604800      ; Expire
+              300 )       ; Negative TTL
+
+; Name server
+@           IN  NS      srv-dns-01.unidadvictimas.corp.
+srv-dns-01  IN  A       10.0.40.3
+
+; ── All web traffic enters through the proxy ─────────────────────────────────
+; NPM is the single entry point — it routes internally by Host: header
+
+@           IN  A       10.0.40.6   ; unidadvictimas.corp    → srv-proxy-01
+rni         IN  A       10.0.40.6   ; rni.unidadvictimas.corp → srv-proxy-01
+intranet    IN  A       10.0.40.6   ; intranet.unidadvictimas.corp → srv-proxy-01
+proxy       IN  A       10.0.40.6   ; proxy.unidadvictimas.corp → NPM admin panel

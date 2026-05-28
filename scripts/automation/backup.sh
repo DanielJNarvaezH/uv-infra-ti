@@ -163,8 +163,8 @@ CONFIG_FILES=(
     "docker/dhcp/dhcpd.conf"
     "docker/dns/named.conf"
     "docker/dns/zones/db.127"
-    "docker/dns/zones/db.unidadvictimas.co"
-    "docker/dns/zones/db.uv.local"
+    "docker/dns/zones/db.unidadvictimas.corp"
+    "docker/dns/zones/db.uv.interno"
     "docker/smtp/Dockerfile"
     "docker/docker-compose.yml"
 )

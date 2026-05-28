@@ -31,6 +31,36 @@ command -v podman-compose >/dev/null 2>&1 || err "podman-compose no está instal
 [ -f "${DOCKER_DIR}/docker-compose.yml" ] || err "No se encontró docker/docker-compose.yml"
 
 # -----------------------------------------------------------------------------
+# Verificar / agregar entradas en /etc/hosts
+# -----------------------------------------------------------------------------
+ETC_HOSTS="/etc/hosts"
+REQUIRED_HOSTS=(
+    "127.0.0.1   unidadvictimas.corp"
+    "127.0.0.1   rni.unidadvictimas.corp"
+    "127.0.0.1   intranet.unidadvictimas.corp"
+    "127.0.0.1   proxy.unidadvictimas.corp"
+)
+
+HOSTS_CHANGED=false
+for entry in "${REQUIRED_HOSTS[@]}"; do
+    domain=$(echo "$entry" | awk '{print $2}')
+    if ! grep -qE "^127\.0\.0\.1[[:space:]]+${domain}\b" "$ETC_HOSTS" 2>/dev/null; then
+        if [ "$HOSTS_CHANGED" = false ]; then
+            log "Agregando dominios locales a $ETC_HOSTS (requiere sudo)..."
+        fi
+        echo "$entry" | sudo tee -a "$ETC_HOSTS" >/dev/null
+        log "  → $domain"
+        HOSTS_CHANGED=true
+    fi
+done
+
+if [ "$HOSTS_CHANGED" = true ]; then
+    log "$ETC_HOSTS actualizado correctamente."
+else
+    log "Todos los dominios locales ya están presentes en $ETC_HOSTS."
+fi
+
+# -----------------------------------------------------------------------------
 # Argumento opcional --build
 # -----------------------------------------------------------------------------
 BUILD_FLAG=""
@@ -141,14 +171,14 @@ if $ALL_HEALTHY; then
     log "  srv-db-01    → ssh -p 2222 uv_dbadmin@localhost"
     log "  srv-files-01 → ssh -p 2223 uv_admin@localhost"
     log ""
-    log "NPM Admin UI  → http://localhost:8081"
+    log "NPM Admin UI  → http://proxy.unidadvictimas.corp:8081"
     log "MailHog UI    → http://localhost:8025 (solo desde VLAN 20)"
     log ""
-    log "Dominios locales (configurar DNS o /etc/hosts):"
-    log "  http://unidadvictimas.co:8080      → redirige a HTTPS en :8443"
-    log "  http://proxy.unidadvictimas.co:8080"
-    log "  http://rni.unidadvictimas.co:8080"
-    log "  http://internal.unidadvictimas.co:8080"
+    log "Dominios locales:"
+    log "  http://unidadvictimas.corp      → Portal Ciudadano"
+    log "  http://rni.unidadvictimas.corp  → RNI"
+    log "  http://intranet.unidadvictimas.corp  → Intranet SUMA"
+    log "  http://proxy.unidadvictimas.corp     → NPM Admin Panel"
     log ""
     log "Nota: en entornos rootless (Podman sin root) los puertos 80/443"
     log "      requieren sysctl. Para usar puertos estándar ejecuta:"
